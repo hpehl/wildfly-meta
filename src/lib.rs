@@ -10,7 +10,7 @@
 //! # Quick Start
 //!
 //! ```no_run
-//! use wildfly_meta::{update_all, WildFlyImageRegistry, FeaturePackRegistry, parse_list, ParseOptions};
+//! use wildfly_meta::{update_all, WildFlyImageRegistry, FeaturePackRegistry, parse_meta_items, ParseOptions};
 //!
 //! // Download or update configuration files from GitHub
 //! let result = update_all().expect("failed to update");
@@ -21,7 +21,7 @@
 //! let packs = FeaturePackRegistry::load_default().expect("failed to load feature packs");
 //!
 //! // Parse a version expression
-//! let items = parse_list("34,dev,ai", &images, &packs, &ParseOptions::all()).unwrap();
+//! let items = parse_meta_items("34,dev,ai", &images, &packs, &ParseOptions::all(), &ParseOptions::all()).unwrap();
 //! for item in &items {
 //!     println!("{}", item.short_name());
 //! }
@@ -33,10 +33,13 @@
 //!   [`identifier`].
 //! - **Feature Packs** — [`FeaturePack`] and [`FeaturePackRegistry`] for Galleon feature pack
 //!   metadata.
-//! - **Parsing** — [`parse_list`], [`parse_image`], [`parse_feature_pack`], and [`parse_item`]
-//!   for the version expression mini-DSL.
+//! - **Parsing** — [`parse_meta_items`], [`parse_wildfly_image`], [`parse_wildfly_images`],
+//!   [`parse_feature_pack`], [`parse_feature_packs`], and [`parse_meta_item`] for the version
+//!   expression mini-DSL.
 //! - **Updates** — [`update_all`] and friends for downloading TOML configuration from GitHub.
-//! - **Completions** — [`suggest`] and [`all_identifiers`] for shell completion support.
+//! - **Completions** — [`suggest_wildfly_images`], [`suggest_feature_packs`],
+//!   [`suggest_meta_items`], [`all_wildfly_images`], [`all_feature_packs`], and
+//!   [`all_meta_items`] for shell completion support.
 
 mod complete;
 mod feature_pack;
@@ -45,10 +48,16 @@ mod parse;
 mod update;
 mod wildfly_image;
 
-pub use complete::{all_identifiers, suggest, CompletionOptions};
+pub use complete::{
+    all_feature_packs, all_meta_items, all_wildfly_images, suggest_feature_packs,
+    suggest_meta_items, suggest_wildfly_images, CompletionOptions,
+};
 pub use feature_pack::{FeaturePack, FeaturePackRegistry};
 pub use meta_item::MetaItem;
-pub use parse::{parse_feature_pack, parse_image, parse_item, parse_list, ParseOptions};
+pub use parse::{
+    parse_feature_pack, parse_feature_packs, parse_meta_item, parse_meta_items,
+    parse_wildfly_image, parse_wildfly_images, ParseOptions,
+};
 pub use update::{
     config_dir, feature_packs_path, images_path, update_all, update_all_with_base_url,
     update_feature_packs, update_feature_packs_with_base_url, update_images,
