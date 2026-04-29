@@ -32,7 +32,7 @@ fn main() -> Result<()> {
     // Parse a mixed expression
     let items = parse_list("34,35,ai", &images, &packs, &ParseOptions::all())?;
     for item in &items {
-        println!("{}", item.welcome_label());
+        println!("{}", item.full_name());
     }
     Ok(())
 }
@@ -60,9 +60,10 @@ Key methods:
 
 | Method              | Description                                                              |
 |---------------------|--------------------------------------------------------------------------|
-| `image_name()`      | Full image reference (e.g. `quay.io/wildfly/wildfly:35.0.1.Final-jdk21`) |
+| `image_ref()`       | Full image reference (e.g. `quay.io/wildfly/wildfly:35.0.1.Final-jdk21`) |
 | `is_dev()`          | `true` for the development version                                       |
-| `display_version()` | `"dev"` or the short version string (`"10"`, `"26.1"`, `"39"`)           |
+| `short_name()`      | `"dev"` or the short version string (`"10"`, `"26.1"`, `"39"`)           |
+| `full_name()`       | `"WildFly dev"` or `"WildFly 34.0"` for releases                        |
 | `http_port()`       | Computed HTTP port (8000 + offset)                                       |
 | `management_port()` | Computed management port (9000 + offset)                                 |
 
@@ -110,10 +111,11 @@ Key methods:
 
 | Method           | Description                                                         |
 |------------------|---------------------------------------------------------------------|
-| `port_offset()`  | Computed port offset (10000 + shortcut_index * 100 + version_index) |
-| `container_id()` | Container identifier (e.g. `ai-0-9-0`)                              |
-| `download_url()` | Maven Central URL for the doc archive                               |
-| `display_name()` | `"shortcut version"` format                                         |
+| `port_offset()`    | Computed port offset (10000 + shortcut_index * 100 + version_index) |
+| `container_name()` | Container-safe name (e.g. `ai-0-9-0`)                               |
+| `download_url()`   | Maven Central URL for the doc archive                               |
+| `short_name()`     | `"shortcut version"` format (e.g. `"ai 0.9.0"`)                    |
+| `full_name()`      | Branded name (e.g. `"AI Feature Pack 0.9.0"`)                      |
 
 ### `FeaturePackRegistry`
 
@@ -195,12 +197,12 @@ pub enum MetaItem {
 
 | Method | Description |
 |--------|-------------|
-| `display_name()` | Display string for the item |
+| `short_name()` | Short display string for the item |
+| `full_name()` | Branded label (e.g. `"WildFly 34.0"` or `"AI Feature Pack 0.9.0"`) |
 | `port_offset()` | Port offset (identifier for images, computed for feature packs) |
-| `container_id()` | Container identifier |
-| `source_type()` | `"wildfly"` or `"feature-pack"` |
-| `source_name()` | Parseable name (version or `shortcut:version`) |
-| `welcome_label()` | Human-readable label (e.g. `"WildFly 34"` or `"AI Feature Pack 0.9.0"`) |
+| `container_name()` | Container-safe name |
+| `kind()` | `"wildfly"` or `"feature-pack"` |
+| `expression()` | Re-parseable expression (version or `shortcut:version`) |
 
 ## Configuration Update
 
