@@ -7,6 +7,8 @@ use anyhow::Result;
 use semver::Version;
 use serde::Deserialize;
 
+use crate::update::images_path;
+
 pub static DEVELOPMENT_VERSION: &str = "dev";
 pub static DEVELOPMENT_TAG: &str = "development";
 
@@ -107,6 +109,10 @@ pub struct ImageRegistry {
 }
 
 impl ImageRegistry {
+    pub fn load_default() -> Result<Self> {
+        Self::load(&images_path())
+    }
+
     pub fn load(path: &Path) -> Result<Self> {
         let content = fs::read_to_string(path)?;
         Self::from_toml(&content)

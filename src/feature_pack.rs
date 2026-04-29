@@ -5,6 +5,8 @@ use std::path::Path;
 use anyhow::Result;
 use serde::Deserialize;
 
+use crate::update::feature_packs_path;
+
 const FP_PORT_OFFSET_BASE: u16 = 10_000;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -62,6 +64,10 @@ pub struct FeaturePackRegistry {
 }
 
 impl FeaturePackRegistry {
+    pub fn load_default() -> Result<Self> {
+        Self::load(&feature_packs_path())
+    }
+
     pub fn load(path: &Path) -> Result<Self> {
         let content = fs::read_to_string(path)?;
         Self::from_toml(&content)
