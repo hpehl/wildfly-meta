@@ -47,7 +47,8 @@ mod update;
 pub use complete::{all_identifiers, suggest, CompletionOptions};
 pub use feature_pack::{FeaturePack, FeaturePackRegistry};
 pub use image::{
-    identifier, wildfly_dev, ImageRegistry, WildFlyImage, DEVELOPMENT_TAG, DEVELOPMENT_VERSION,
+    identifier, identifier_major, identifier_minor, wildfly_dev, ImageRegistry, WildFlyImage,
+    DEVELOPMENT_TAG, DEVELOPMENT_VERSION,
 };
 pub use parse::{parse_feature_pack, parse_image, parse_item, parse_list, MetaItem, ParseOptions};
 pub use update::{

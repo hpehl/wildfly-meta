@@ -4,6 +4,7 @@
 //! and mixed references to both images and feature packs (e.g. `"3x10,23..26,5x28,34,dev,ai"`).
 
 use std::cmp::Ordering;
+use std::sync::LazyLock;
 
 use anyhow::{bail, Result};
 use regex::Regex;
@@ -109,12 +110,14 @@ impl Default for ParseOptions {
 ///
 /// Accepts `"dev"` for the development build, a two-digit major version (e.g. `"34"`),
 /// or a `major.minor` form (e.g. `"26.1"`).
+static VERSION_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^(?<major>[0-9]{2})(?<dot>\.)?(?<minor>[0-9])?$").unwrap());
+
 pub fn parse_image(input: &str, registry: &ImageRegistry) -> Result<WildFlyImage> {
-    let version_re = Regex::new(r"^(?<major>[0-9]{2})(?<dot>\.)?(?<minor>[0-9])?$").unwrap();
     if input == DEVELOPMENT_VERSION {
         Ok(wildfly_dev())
     } else {
-        match version_re.captures(input) {
+        match VERSION_RE.captures(input) {
             Some(c) => {
                 let major: u16 = c["major"].parse()?;
                 let dot = c.name("dot").is_some();
@@ -260,28 +263,24 @@ fn parse_range(
         (1, range)
     };
 
-    if !range.contains("..") {
-        bail!("invalid range syntax: '{}'", range)
-    }
-    let parts = range.split("..").collect::<Vec<&str>>();
-    if parts.len() != 2 {
-        bail!("invalid range syntax: '{}'", range)
-    }
-    if parts[0] == DEVELOPMENT_VERSION || parts[1] == DEVELOPMENT_VERSION {
+    let (start, end) = range
+        .split_once("..")
+        .ok_or_else(|| anyhow::anyhow!("invalid range syntax: '{}'", range))?;
+    if start == DEVELOPMENT_VERSION || end == DEVELOPMENT_VERSION {
         bail!("'dev' is not allowed in range '{}'", range)
     }
 
-    let from = match parts[0] {
+    let from = match start {
         "" => images.first().cloned(),
-        _ => parse_image(parts[0], images).ok(),
+        _ => parse_image(start, images).ok(),
     };
-    let to = match parts[1] {
+    let to = match end {
         "" => images.last().cloned(),
-        _ => parse_image(parts[1], images).ok(),
+        _ => parse_image(end, images).ok(),
     };
 
-    let from = from.ok_or_else(|| anyhow::anyhow!("invalid range bound: from '{}'", parts[0]))?;
-    let to = to.ok_or_else(|| anyhow::anyhow!("invalid range bound: to '{}'", parts[1]))?;
+    let from = from.ok_or_else(|| anyhow::anyhow!("invalid range bound: from '{}'", start))?;
+    let to = to.ok_or_else(|| anyhow::anyhow!("invalid range bound: to '{}'", end))?;
 
     match from.identifier.cmp(&to.identifier) {
         Ordering::Equal => Ok(vec![MetaItem::Image(from); multiplier as usize]),
@@ -311,20 +310,17 @@ fn parse_with_multiplier(
 }
 
 fn extract_multiplier(input: &str) -> Option<(u16, &str)> {
-    if input.contains('x') {
-        let parts = input.split('x').collect::<Vec<&str>>();
-        if parts.len() == 2 && !parts[1].is_empty() {
-            if let Ok(multiplier) = parts[0].parse::<u16>() {
-                if multiplier > 0 {
-                    return Some((multiplier, parts[1]));
-                }
+    match input.split_once('x') {
+        Some((prefix, suffix)) if !suffix.is_empty() && !suffix.contains('x') => {
+            let multiplier: u16 = prefix.parse().ok()?;
+            if multiplier > 0 {
+                Some((multiplier, suffix))
+            } else {
+                None
             }
-            None
-        } else {
-            None
         }
-    } else {
-        Some((1, input))
+        Some(_) => None,
+        None => Some((1, input)),
     }
 }
 
@@ -338,6 +334,22 @@ mod tests {
 
     fn fp_registry() -> FeaturePackRegistry {
         FeaturePackRegistry::from_toml(include_str!("../feature-packs.toml")).unwrap()
+    }
+
+    // ------------------------------------------------------ parse options
+
+    #[test]
+    fn parse_options_default_enables_all() {
+        let opts = ParseOptions::default();
+        assert!(opts.ranges);
+        assert!(opts.multipliers);
+    }
+
+    #[test]
+    fn parse_options_none_disables_all() {
+        let opts = ParseOptions::none();
+        assert!(!opts.ranges);
+        assert!(!opts.multipliers);
     }
 
     // ------------------------------------------------------ parse_image
@@ -415,6 +427,15 @@ mod tests {
         assert!(err.contains("Unknown version"));
     }
 
+    #[test]
+    fn parse_fp_versioned_unknown_shortcut() {
+        let reg = fp_registry();
+        let result = parse_feature_pack("unknown:1.0", &reg);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("Unknown feature pack 'unknown'"));
+    }
+
     // ------------------------------------------------------ parse_item
 
     #[test]
@@ -441,7 +462,7 @@ mod tests {
         assert_eq!(item.source_type(), "feature-pack");
     }
 
-    // ------------------------------------------------------ parse_list
+    // ------------------------------------------------------ parse_list: basic
 
     #[test]
     fn parse_list_single_version() {
@@ -478,32 +499,6 @@ mod tests {
     }
 
     #[test]
-    fn parse_list_with_range() {
-        let imgs = image_registry();
-        let fps = fp_registry();
-        let items = parse_list("20..22", &imgs, &fps, &ParseOptions::all()).unwrap();
-        assert_eq!(items.len(), 3); // 20, 21, 22
-    }
-
-    #[test]
-    fn parse_list_with_multiplier() {
-        let imgs = image_registry();
-        let fps = fp_registry();
-        let items = parse_list("3x34", &imgs, &fps, &ParseOptions::all()).unwrap();
-        assert_eq!(items.len(), 3);
-        assert!(items.iter().all(|i| i.display_name() == "34.0"));
-    }
-
-    #[test]
-    fn parse_list_fp_multiplier() {
-        let imgs = image_registry();
-        let fps = fp_registry();
-        let items = parse_list("2xai", &imgs, &fps, &ParseOptions::all()).unwrap();
-        assert_eq!(items.len(), 2);
-        assert!(items.iter().all(|i| matches!(i, MetaItem::FeaturePack(_))));
-    }
-
-    #[test]
     fn parse_list_full_dsl() {
         let imgs = image_registry();
         let fps = fp_registry();
@@ -515,6 +510,61 @@ mod tests {
         )
         .unwrap();
         assert!(items.len() >= 14);
+    }
+
+    #[test]
+    fn parse_list_sorted_by_port_offset() {
+        let imgs = image_registry();
+        let fps = fp_registry();
+        let items = parse_list("34,10,ai", &imgs, &fps, &ParseOptions::all()).unwrap();
+        let offsets: Vec<u16> = items.iter().map(|i| i.port_offset()).collect();
+        let mut sorted = offsets.clone();
+        sorted.sort();
+        assert_eq!(offsets, sorted);
+    }
+
+    #[test]
+    fn parse_list_empty_segments_ignored() {
+        let imgs = image_registry();
+        let fps = fp_registry();
+        let items = parse_list(",34,,25,", &imgs, &fps, &ParseOptions::all()).unwrap();
+        assert_eq!(items.len(), 2);
+    }
+
+    #[test]
+    fn parse_list_whitespace_trimmed() {
+        let imgs = image_registry();
+        let fps = fp_registry();
+        let items = parse_list(" 34 , 25 ", &imgs, &fps, &ParseOptions::all()).unwrap();
+        assert_eq!(items.len(), 2);
+    }
+
+    #[test]
+    fn parse_list_invalid() {
+        let imgs = image_registry();
+        let fps = fp_registry();
+        assert!(parse_list("", &imgs, &fps, &ParseOptions::none()).is_ok());
+        assert!(parse_list("foo", &imgs, &fps, &ParseOptions::none()).is_err());
+    }
+
+    #[test]
+    fn parse_list_multiple_errors() {
+        let imgs = image_registry();
+        let fps = fp_registry();
+        let result = parse_list("foo,bar", &imgs, &fps, &ParseOptions::all());
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains('\n'));
+    }
+
+    // ------------------------------------------------------ parse_list: ranges
+
+    #[test]
+    fn parse_list_with_range() {
+        let imgs = image_registry();
+        let fps = fp_registry();
+        let items = parse_list("20..22", &imgs, &fps, &ParseOptions::all()).unwrap();
+        assert_eq!(items.len(), 3); // 20, 21, 22
     }
 
     #[test]
@@ -538,15 +588,23 @@ mod tests {
         let imgs = image_registry();
         let fps = fp_registry();
         let items = parse_list("..", &imgs, &fps, &ParseOptions::all()).unwrap();
-        assert_eq!(items.len(), 33); // all images
+        assert_eq!(items.len(), 33);
     }
 
     #[test]
-    fn parse_list_invalid() {
+    fn parse_list_range_equal_bounds() {
         let imgs = image_registry();
         let fps = fp_registry();
-        assert!(parse_list("", &imgs, &fps, &ParseOptions::none()).is_ok()); // empty = empty list
-        assert!(parse_list("foo", &imgs, &fps, &ParseOptions::none()).is_err());
+        let items = parse_list("25..25", &imgs, &fps, &ParseOptions::all()).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].display_name(), "25.0");
+    }
+
+    #[test]
+    fn parse_list_range_reversed() {
+        let imgs = image_registry();
+        let fps = fp_registry();
+        assert!(parse_list("30..20", &imgs, &fps, &ParseOptions::all()).is_err());
     }
 
     #[test]
@@ -557,7 +615,89 @@ mod tests {
         assert!(parse_list("..dev", &imgs, &fps, &ParseOptions::all()).is_err());
     }
 
-    // ------------------------------------------------------ MetaItem
+    #[test]
+    fn parse_list_range_without_multipliers() {
+        let imgs = image_registry();
+        let fps = fp_registry();
+        let opts = ParseOptions {
+            ranges: true,
+            multipliers: false,
+        };
+        let items = parse_list("20..22", &imgs, &fps, &opts).unwrap();
+        assert_eq!(items.len(), 3);
+    }
+
+    // ------------------------------------------------------ parse_list: multipliers
+
+    #[test]
+    fn parse_list_with_multiplier() {
+        let imgs = image_registry();
+        let fps = fp_registry();
+        let items = parse_list("3x34", &imgs, &fps, &ParseOptions::all()).unwrap();
+        assert_eq!(items.len(), 3);
+        assert!(items.iter().all(|i| i.display_name() == "34.0"));
+    }
+
+    #[test]
+    fn parse_list_fp_multiplier() {
+        let imgs = image_registry();
+        let fps = fp_registry();
+        let items = parse_list("2xai", &imgs, &fps, &ParseOptions::all()).unwrap();
+        assert_eq!(items.len(), 2);
+        assert!(items.iter().all(|i| matches!(i, MetaItem::FeaturePack(_))));
+    }
+
+    #[test]
+    fn parse_list_multiplied_range() {
+        let imgs = image_registry();
+        let fps = fp_registry();
+        let items = parse_list("2x20..22", &imgs, &fps, &ParseOptions::all()).unwrap();
+        assert_eq!(items.len(), 6); // 3 versions * 2
+    }
+
+    #[test]
+    fn parse_list_invalid_multiplier_on_range() {
+        let imgs = image_registry();
+        let fps = fp_registry();
+        let result = parse_list("0x20..25", &imgs, &fps, &ParseOptions::all());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_list_invalid_multiplier_on_item() {
+        let imgs = image_registry();
+        let fps = fp_registry();
+        let result = parse_list("0x34", &imgs, &fps, &ParseOptions::all());
+        assert!(result.is_err());
+    }
+
+    // ------------------------------------------------------ parse_list: disabled options
+
+    #[test]
+    fn parse_list_no_options_ignores_range_syntax() {
+        let imgs = image_registry();
+        let fps = fp_registry();
+        let result = parse_list("20..22", &imgs, &fps, &ParseOptions::none());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_list_no_multiplier_treats_as_item() {
+        let imgs = image_registry();
+        let fps = fp_registry();
+        let result = parse_list("3x34", &imgs, &fps, &ParseOptions::none());
+        assert!(result.is_err());
+    }
+
+    // ------------------------------------------------------ meta item
+
+    #[test]
+    fn meta_item_display_name_feature_pack() {
+        let fps = fp_registry();
+        let fp = parse_feature_pack("ai", &fps).unwrap();
+        let item = MetaItem::FeaturePack(fp);
+        assert_eq!(item.display_name(), "ai 0.9.0");
+    }
 
     #[test]
     fn meta_item_source_type() {
@@ -600,6 +740,14 @@ mod tests {
         assert_eq!(fp.container_id(), "ai-0-9-0");
     }
 
+    #[test]
+    fn meta_item_port_offset_feature_pack() {
+        let fps = fp_registry();
+        let fp = parse_feature_pack("ai", &fps).unwrap();
+        let item = MetaItem::FeaturePack(fp);
+        assert_eq!(item.port_offset(), 10_000);
+    }
+
     // ------------------------------------------------------ extract_multiplier
 
     #[test]
@@ -616,6 +764,12 @@ mod tests {
         assert_eq!(extract_multiplier("x25"), None);
         assert_eq!(extract_multiplier("25x"), None);
         assert_eq!(extract_multiplier("10xx20"), None);
+    }
+
+    #[test]
+    fn multiplier_no_x() {
+        assert_eq!(extract_multiplier("34"), Some((1, "34")));
+        assert_eq!(extract_multiplier("dev"), Some((1, "dev")));
     }
 
     // ------------------------------------------------------ port offset separation

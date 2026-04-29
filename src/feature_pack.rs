@@ -215,11 +215,57 @@ mod tests {
         FeaturePackRegistry::from_toml(toml).expect("failed to parse feature-packs.toml")
     }
 
+    // ------------------------------------------------------ loading & config_version
+
     #[test]
     fn load_all_packs() {
         let reg = test_registry();
         assert_eq!(reg.len(), 5);
     }
+
+    #[test]
+    fn load_from_path() {
+        let tmp = std::env::temp_dir().join("wildfly-meta-test-fp-load");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        let path = tmp.join("feature-packs.toml");
+        let content = include_str!("../feature-packs.toml");
+        fs::write(&path, content).unwrap();
+
+        let reg = FeaturePackRegistry::load(&path).unwrap();
+        assert_eq!(reg.len(), 5);
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn load_from_missing_path() {
+        let path = Path::new("/nonexistent/feature-packs.toml");
+        assert!(FeaturePackRegistry::load(path).is_err());
+    }
+
+    #[test]
+    fn config_version_from_file() {
+        let tmp = std::env::temp_dir().join("wildfly-meta-test-fp-cv");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        let path = tmp.join("feature-packs.toml");
+        let content = include_str!("../feature-packs.toml");
+        fs::write(&path, content).unwrap();
+
+        let version = FeaturePackRegistry::config_version(&path).unwrap();
+        assert!(version >= 1);
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn config_version_missing_file() {
+        let path = Path::new("/nonexistent/feature-packs.toml");
+        assert!(FeaturePackRegistry::config_version(path).is_err());
+    }
+
+    // ------------------------------------------------------ registry queries
 
     #[test]
     fn get_by_shortcut_version() {
@@ -249,6 +295,73 @@ mod tests {
     }
 
     #[test]
+    fn known_shortcuts() {
+        let reg = test_registry();
+        let shortcuts = reg.known_shortcuts();
+        assert_eq!(
+            shortcuts,
+            vec!["ai", "graphql", "grpc", "keycloak", "myfaces"]
+        );
+    }
+
+    #[test]
+    fn known_versions_for_shortcut() {
+        let reg = test_registry();
+        let versions = reg.known_versions("ai");
+        assert_eq!(versions, vec!["0.9.0"]);
+    }
+
+    #[test]
+    fn known_versions_unknown() {
+        let reg = test_registry();
+        assert!(reg.known_versions("unknown").is_empty());
+    }
+
+    #[test]
+    fn all_identifiers() {
+        let reg = test_registry();
+        let ids = reg.all_identifiers();
+        assert!(ids.contains(&"ai".to_string()));
+        assert!(ids.contains(&"ai:0.9.0".to_string()));
+        assert!(ids.contains(&"grpc".to_string()));
+        assert!(ids.contains(&"grpc:0.1.16".to_string()));
+    }
+
+    #[test]
+    fn keys_returns_sorted() {
+        let reg = test_registry();
+        let keys: Vec<_> = reg.keys().collect();
+        let mut sorted = keys.clone();
+        sorted.sort();
+        assert_eq!(keys, sorted);
+    }
+
+    #[test]
+    fn all_returns_all_packs() {
+        let reg = test_registry();
+        assert_eq!(reg.all().len(), reg.len());
+    }
+
+    #[test]
+    fn is_empty_false() {
+        let reg = test_registry();
+        assert!(!reg.is_empty());
+    }
+
+    #[test]
+    fn is_empty_true() {
+        let toml = r#"
+config_version = 1
+feature_packs = []
+"#;
+        let reg = FeaturePackRegistry::from_toml(toml).unwrap();
+        assert!(reg.is_empty());
+        assert_eq!(reg.len(), 0);
+    }
+
+    // ------------------------------------------------------ index computation
+
+    #[test]
     fn shortcut_index_computed() {
         let reg = test_registry();
         assert_eq!(reg.get("ai", "0.9.0").unwrap().shortcut_index, 0);
@@ -265,6 +378,40 @@ mod tests {
     }
 
     #[test]
+    fn multiple_versions_per_shortcut() {
+        let toml = r#"
+config_version = 1
+
+[[feature_packs]]
+shortcut = "ai"
+name = "AI"
+group_id = "org.wildfly.ai"
+artifact_id = "wildfly-ai-fp"
+version = "0.8.0"
+maven_version = "0.8.0"
+
+[[feature_packs]]
+shortcut = "ai"
+name = "AI"
+group_id = "org.wildfly.ai"
+artifact_id = "wildfly-ai-fp"
+version = "0.9.0"
+maven_version = "0.9.0"
+"#;
+        let reg = FeaturePackRegistry::from_toml(toml).unwrap();
+        assert_eq!(reg.len(), 2);
+        assert_eq!(reg.get("ai", "0.8.0").unwrap().version_index, 0);
+        assert_eq!(reg.get("ai", "0.9.0").unwrap().version_index, 1);
+        assert_eq!(reg.get("ai", "0.8.0").unwrap().shortcut_index, 0);
+        assert_eq!(reg.get("ai", "0.9.0").unwrap().shortcut_index, 0);
+        let latest = reg.latest("ai").unwrap();
+        assert_eq!(latest.version, "0.9.0");
+        assert_eq!(reg.known_versions("ai"), vec!["0.8.0", "0.9.0"]);
+    }
+
+    // ------------------------------------------------------ feature pack methods
+
+    #[test]
     fn port_offset() {
         let reg = test_registry();
         assert_eq!(reg.get("ai", "0.9.0").unwrap().port_offset(), 10_000);
@@ -272,6 +419,24 @@ mod tests {
         assert_eq!(reg.get("grpc", "0.1.16").unwrap().port_offset(), 10_200);
         assert_eq!(reg.get("keycloak", "26.6.1").unwrap().port_offset(), 10_300);
         assert_eq!(reg.get("myfaces", "2.0.3").unwrap().port_offset(), 10_400);
+    }
+
+    #[test]
+    fn unique_port_offsets() {
+        let reg = test_registry();
+        let mut offsets: Vec<u16> = reg.all().iter().map(|fp| fp.port_offset()).collect();
+        let len = offsets.len();
+        offsets.sort();
+        offsets.dedup();
+        assert_eq!(len, offsets.len());
+    }
+
+    #[test]
+    fn port_offsets_start_at_10000() {
+        let reg = test_registry();
+        for fp in reg.all() {
+            assert!(fp.port_offset() >= 10_000);
+        }
     }
 
     #[test]
@@ -312,56 +477,5 @@ mod tests {
             reg.get("grpc", "0.1.16").unwrap().display_name(),
             "grpc 0.1.16"
         );
-    }
-
-    #[test]
-    fn known_shortcuts() {
-        let reg = test_registry();
-        let shortcuts = reg.known_shortcuts();
-        assert_eq!(
-            shortcuts,
-            vec!["ai", "graphql", "grpc", "keycloak", "myfaces"]
-        );
-    }
-
-    #[test]
-    fn known_versions_for_shortcut() {
-        let reg = test_registry();
-        let versions = reg.known_versions("ai");
-        assert_eq!(versions, vec!["0.9.0"]);
-    }
-
-    #[test]
-    fn known_versions_unknown() {
-        let reg = test_registry();
-        assert!(reg.known_versions("unknown").is_empty());
-    }
-
-    #[test]
-    fn all_identifiers() {
-        let reg = test_registry();
-        let ids = reg.all_identifiers();
-        assert!(ids.contains(&"ai".to_string()));
-        assert!(ids.contains(&"ai:0.9.0".to_string()));
-        assert!(ids.contains(&"grpc".to_string()));
-        assert!(ids.contains(&"grpc:0.1.16".to_string()));
-    }
-
-    #[test]
-    fn unique_port_offsets() {
-        let reg = test_registry();
-        let mut offsets: Vec<u16> = reg.all().iter().map(|fp| fp.port_offset()).collect();
-        let len = offsets.len();
-        offsets.sort();
-        offsets.dedup();
-        assert_eq!(len, offsets.len());
-    }
-
-    #[test]
-    fn port_offsets_start_at_10000() {
-        let reg = test_registry();
-        for fp in reg.all() {
-            assert!(fp.port_offset() >= 10_000);
-        }
     }
 }

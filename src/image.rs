@@ -27,7 +27,6 @@ const MANAGEMENT_PORT_BASE: u16 = 9000;
 pub fn wildfly_dev() -> WildFlyImage {
     WildFlyImage {
         identifier: 0,
-        port_offset: 0,
         version: Version::new(0, 0, 0),
         short_version: String::new(),
         core_version: Version::new(0, 0, 0),
@@ -46,7 +45,6 @@ pub fn wildfly_dev() -> WildFlyImage {
 /// `major * 10 + minor` (e.g. `261` for WildFly 26.1).
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct WildFlyImage {
-    port_offset: u16,
     /// Numeric identifier encoding `major * 10 + minor` (e.g. `340` for WildFly 34.0).
     pub identifier: u16,
     /// Full semantic version of the WildFly release (e.g. `34.0.1`).
@@ -88,17 +86,17 @@ impl WildFlyImage {
         }
     }
 
-    /// Returns the HTTP port for this image (base `8000` + port offset).
+    /// Returns the HTTP port for this image (base `8000` + identifier as port offset).
     pub fn http_port(&self) -> u16 {
         HTTP_PORT_BASE
-            .checked_add(self.port_offset)
+            .checked_add(self.identifier)
             .expect("HTTP port overflow")
     }
 
-    /// Returns the management port for this image (base `9000` + port offset).
+    /// Returns the management port for this image (base `9000` + identifier as port offset).
     pub fn management_port(&self) -> u16 {
         MANAGEMENT_PORT_BASE
-            .checked_add(self.port_offset)
+            .checked_add(self.identifier)
             .expect("management port overflow")
     }
 }
@@ -161,7 +159,6 @@ impl ImageRegistry {
             let id = identifier(entry.major, entry.minor);
             let image = WildFlyImage {
                 identifier: id,
-                port_offset: (entry.major * 10 + entry.minor),
                 short_version: format!("{}.{}", entry.major, entry.minor),
                 version: entry.version,
                 core_version: entry.core_version,
@@ -229,6 +226,16 @@ pub fn identifier(major: u16, minor: u16) -> u16 {
     major * 10 + minor
 }
 
+/// Extracts the major version from an identifier (e.g. `340` → `34`).
+pub fn identifier_major(id: u16) -> u16 {
+    id / 10
+}
+
+/// Extracts the minor version from an identifier (e.g. `261` → `1`).
+pub fn identifier_minor(id: u16) -> u16 {
+    id % 10
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -238,10 +245,70 @@ mod tests {
         ImageRegistry::from_toml(toml).expect("failed to parse wildfly-images.toml")
     }
 
+    // ------------------------------------------------------ loading & config_version
+
     #[test]
     fn load_all_images() {
         let reg = test_registry();
         assert_eq!(reg.len(), 33);
+    }
+
+    #[test]
+    fn load_from_path() {
+        let tmp = std::env::temp_dir().join("wildfly-meta-test-img-load");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        let path = tmp.join("wildfly-images.toml");
+        let content = include_str!("../wildfly-images.toml");
+        fs::write(&path, content).unwrap();
+
+        let reg = ImageRegistry::load(&path).unwrap();
+        assert_eq!(reg.len(), 33);
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn load_from_missing_path() {
+        let path = Path::new("/nonexistent/wildfly-images.toml");
+        assert!(ImageRegistry::load(path).is_err());
+    }
+
+    #[test]
+    fn config_version_from_file() {
+        let tmp = std::env::temp_dir().join("wildfly-meta-test-img-cv");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        let path = tmp.join("wildfly-images.toml");
+        let content = include_str!("../wildfly-images.toml");
+        fs::write(&path, content).unwrap();
+
+        let version = ImageRegistry::config_version(&path).unwrap();
+        assert!(version >= 1);
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn config_version_missing_file() {
+        let path = Path::new("/nonexistent/wildfly-images.toml");
+        assert!(ImageRegistry::config_version(path).is_err());
+    }
+
+    // ------------------------------------------------------ registry queries
+
+    #[test]
+    fn get_by_identifier() {
+        let reg = test_registry();
+        let img = reg.get(261).unwrap();
+        assert_eq!(img.short_version, "26.1");
+        assert_eq!(img.suffix, "Final-jdk17");
+    }
+
+    #[test]
+    fn get_unknown() {
+        let reg = test_registry();
+        assert!(reg.get(999).is_none());
     }
 
     #[test]
@@ -261,17 +328,14 @@ mod tests {
     }
 
     #[test]
-    fn get_by_identifier() {
-        let reg = test_registry();
-        let img = reg.get(261).unwrap();
-        assert_eq!(img.short_version, "26.1");
-        assert_eq!(img.suffix, "Final-jdk17");
-    }
-
-    #[test]
-    fn get_unknown() {
-        let reg = test_registry();
-        assert!(reg.get(999).is_none());
+    fn first_and_last_on_empty() {
+        let toml = r#"
+config_version = 1
+images = []
+"#;
+        let reg = ImageRegistry::from_toml(toml).unwrap();
+        assert!(reg.first().is_none());
+        assert!(reg.last().is_none());
     }
 
     #[test]
@@ -280,6 +344,80 @@ mod tests {
         let images = reg.range(200, 220);
         assert_eq!(images.len(), 3); // 20.0, 21.0, 22.0
     }
+
+    #[test]
+    fn range_empty_result() {
+        let reg = test_registry();
+        let images = reg.range(500, 600);
+        assert!(images.is_empty());
+    }
+
+    #[test]
+    fn keys_returns_sorted() {
+        let reg = test_registry();
+        let keys: Vec<_> = reg.keys().copied().collect();
+        let mut sorted = keys.clone();
+        sorted.sort();
+        assert_eq!(keys, sorted);
+    }
+
+    #[test]
+    fn all_returns_all_images() {
+        let reg = test_registry();
+        assert_eq!(reg.all().len(), reg.len());
+    }
+
+    #[test]
+    fn is_empty_false() {
+        let reg = test_registry();
+        assert!(!reg.is_empty());
+    }
+
+    #[test]
+    fn is_empty_true() {
+        let toml = r#"
+config_version = 1
+images = []
+"#;
+        let reg = ImageRegistry::from_toml(toml).unwrap();
+        assert!(reg.is_empty());
+        assert_eq!(reg.len(), 0);
+    }
+
+    // ------------------------------------------------------ identifier helpers
+
+    #[test]
+    fn identifier_roundtrip() {
+        assert_eq!(identifier(34, 0), 340);
+        assert_eq!(identifier_major(340), 34);
+        assert_eq!(identifier_minor(340), 0);
+        assert_eq!(identifier(26, 1), 261);
+        assert_eq!(identifier_major(261), 26);
+        assert_eq!(identifier_minor(261), 1);
+    }
+
+    // ------------------------------------------------------ wildfly_dev
+
+    #[test]
+    fn wildfly_dev_fields() {
+        let dev = wildfly_dev();
+        assert_eq!(dev.identifier, 0);
+        assert!(dev.is_dev());
+        assert_eq!(dev.http_port(), 8000);
+        assert_eq!(dev.management_port(), 9000);
+        assert!(dev.short_version.is_empty());
+        assert!(dev.platforms.is_empty());
+    }
+
+    #[test]
+    fn is_dev() {
+        let dev = wildfly_dev();
+        assert!(dev.is_dev());
+        let reg = test_registry();
+        assert!(!reg.get(100).unwrap().is_dev());
+    }
+
+    // ------------------------------------------------------ wildfly image methods
 
     #[test]
     fn display_version_regular() {
@@ -310,6 +448,14 @@ mod tests {
     }
 
     #[test]
+    fn image_name_includes_suffix() {
+        let reg = test_registry();
+        let img = reg.get(261).unwrap();
+        let name = img.image_name();
+        assert!(name.contains("Final-jdk17"));
+    }
+
+    #[test]
     fn http_port() {
         let reg = test_registry();
         let img = reg.get(340).unwrap();
@@ -324,14 +470,6 @@ mod tests {
     }
 
     #[test]
-    fn is_dev() {
-        let dev = wildfly_dev();
-        assert!(dev.is_dev());
-        let reg = test_registry();
-        assert!(!reg.get(100).unwrap().is_dev());
-    }
-
-    #[test]
     fn platforms() {
         let reg = test_registry();
         let old = reg.get(100).unwrap();
@@ -340,11 +478,23 @@ mod tests {
         assert_eq!(new.platforms.len(), 4);
     }
 
+    // ------------------------------------------------------ ordering
+
     #[test]
     fn ordering() {
         let reg = test_registry();
         let a = reg.get(100).unwrap();
         let b = reg.get(390).unwrap();
         assert!(a < b);
+    }
+
+    #[test]
+    fn partial_ord_consistent_with_ord() {
+        let reg = test_registry();
+        let a = reg.get(100).unwrap();
+        let b = reg.get(200).unwrap();
+        assert_eq!(a.partial_cmp(b), Some(Ordering::Less));
+        assert_eq!(b.partial_cmp(a), Some(Ordering::Greater));
+        assert_eq!(a.partial_cmp(a), Some(Ordering::Equal));
     }
 }

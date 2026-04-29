@@ -1,7 +1,7 @@
 //! Shell completion support for version and feature pack identifiers.
 
 use crate::feature_pack::FeaturePackRegistry;
-use crate::image::{ImageRegistry, DEVELOPMENT_VERSION};
+use crate::image::{identifier_major, identifier_minor, ImageRegistry, DEVELOPMENT_VERSION};
 use crate::parse::parse_image;
 
 /// Controls which kinds of completions are offered.
@@ -104,21 +104,21 @@ fn completion_versions(images: &ImageRegistry) -> Vec<String> {
     versions
 }
 
-fn simple_version(identifier: u16) -> String {
-    let major = identifier / 10;
-    let minor = identifier % 10;
+fn simple_version(id: u16) -> String {
+    let minor = identifier_minor(id);
     if minor == 0 {
-        format!("{}", major)
+        format!("{}", identifier_major(id))
     } else {
-        format!("{}.{}", major, minor)
+        format!("{}.{}", identifier_major(id), minor)
     }
 }
 
 fn try_parse_version(input: &str, images: &ImageRegistry) -> Option<(u16, u16)> {
     parse_image(input, images).ok().map(|img| {
-        let major = img.identifier / 10;
-        let minor = img.identifier % 10;
-        (major, minor)
+        (
+            identifier_major(img.identifier),
+            identifier_minor(img.identifier),
+        )
     })
 }
 
@@ -127,8 +127,8 @@ fn versions_after(major: u16, minor: u16, images: &ImageRegistry) -> Vec<String>
         .all()
         .iter()
         .filter(|img| {
-            let img_major = img.identifier / 10;
-            let img_minor = img.identifier % 10;
+            let img_major = identifier_major(img.identifier);
+            let img_minor = identifier_minor(img.identifier);
             if img_major == major {
                 img_minor > minor
             } else {
@@ -159,14 +159,14 @@ fn suggest_after_dots(
         return vec![];
     };
 
-    let start_id = start_major * 10 + start_minor;
+    let start_id = crate::image::identifier(start_major, start_minor);
     images
         .all()
         .iter()
         .filter(|img| img.identifier > start_id)
         .filter(|img| {
-            let img_major = img.identifier / 10;
-            let img_minor = img.identifier % 10;
+            let img_major = identifier_major(img.identifier);
+            let img_minor = identifier_minor(img.identifier);
             match number {
                 1..=9 if !after_dots.ends_with('.') => {
                     img_major >= (number * 10) && img_major < ((number + 1) * 10)
