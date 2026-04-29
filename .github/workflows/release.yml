@@ -1,0 +1,43 @@
+name: Release
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - v[0-9]+.*
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: full
+  RUSTFLAGS: -D warnings
+  RUSTUP_MAX_RETRIES: 10
+
+defaults:
+  run:
+    shell: bash --noprofile --norc -CeEuxo pipefail {0}
+
+jobs:
+  create-release:
+    if: github.repository_owner == 'hpehl'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: taiki-e/create-gh-release-action@v1.11.0
+        with:
+          title: '$version'
+          changelog: CHANGELOG.md
+          token: ${{ secrets.GITHUB_TOKEN }}
+  publish-crate:
+    if: github.repository_owner == 'hpehl'
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo publish --token ${CRATES_TOKEN}
+        env:
+          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
