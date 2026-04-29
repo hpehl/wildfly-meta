@@ -1,3 +1,9 @@
+//! On-demand download and update of TOML configuration files from GitHub.
+//!
+//! Configuration files are stored in `~/.config/wildfly-meta/`. The update functions compare
+//! the local `config_version` against the remote version and only re-download when the remote
+//! is newer.
+
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -9,30 +15,46 @@ use crate::image::{ImageRegistry, WildFlyImagesConfig};
 
 const DEFAULT_BASE_URL: &str = "https://raw.githubusercontent.com/hpehl/wildfly-meta/main";
 
+/// Filename for the WildFly images TOML configuration.
 pub const IMAGES_FILENAME: &str = "wildfly-images.toml";
+
+/// Filename for the feature packs TOML configuration.
 pub const FEATURE_PACKS_FILENAME: &str = "feature-packs.toml";
 
+/// Describes the entries added and removed between two configuration versions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UpdateDiff {
+    /// Display names of newly added entries.
     pub added: Vec<String>,
+    /// Display names of removed entries.
     pub removed: Vec<String>,
 }
 
+/// Outcome of an update operation for a single configuration file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UpdateStatus {
+    /// The file was downloaded for the first time.
     Downloaded {
+        /// The config version of the downloaded file.
         version: u32,
+        /// Number of entries in the downloaded file.
         count: usize,
     },
+    /// The local file was updated to a newer remote version.
     Updated {
+        /// The config version before the update.
         from_version: u32,
+        /// The config version after the update.
         to_version: u32,
+        /// Entries added and removed between the two versions.
         diff: UpdateDiff,
     },
+    /// The local file is already at or ahead of the remote version.
     AlreadyUpToDate(u32),
 }
 
 impl UpdateStatus {
+    /// Returns a human-readable summary line for the given label (e.g. `"WildFly images"`).
     fn summary(&self, label: &str) -> String {
         match self {
             UpdateStatus::Downloaded { version, count } => {
@@ -59,13 +81,17 @@ impl UpdateStatus {
     }
 }
 
+/// Combined result of updating both images and feature packs configuration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UpdateResult {
+    /// Status of the WildFly images update.
     pub images: UpdateStatus,
+    /// Status of the feature packs update.
     pub feature_packs: UpdateStatus,
 }
 
 impl UpdateResult {
+    /// Returns a human-readable summary of both update statuses.
     pub fn summary(&self) -> String {
         let images = self.images.summary("WildFly images");
         let packs = self.feature_packs.summary("Feature packs");
@@ -73,24 +99,29 @@ impl UpdateResult {
     }
 }
 
+/// Returns the configuration directory path (`~/.config/wildfly-meta/`).
 pub fn config_dir() -> PathBuf {
     PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| String::from("~")))
         .join(".config")
         .join("wildfly-meta")
 }
 
+/// Returns the full path to the local WildFly images TOML file.
 pub fn images_path() -> PathBuf {
     config_dir().join(IMAGES_FILENAME)
 }
 
+/// Returns the full path to the local feature packs TOML file.
 pub fn feature_packs_path() -> PathBuf {
     config_dir().join(FEATURE_PACKS_FILENAME)
 }
 
+/// Downloads or updates both configuration files from the default GitHub URL.
 pub fn update_all() -> Result<UpdateResult> {
     update_all_with_base_url(DEFAULT_BASE_URL)
 }
 
+/// Downloads or updates both configuration files from a custom base URL.
 pub fn update_all_with_base_url(base_url: &str) -> Result<UpdateResult> {
     let images = update_images_with_base_url(base_url)?;
     let packs = update_feature_packs_with_base_url(base_url)?;
@@ -100,10 +131,12 @@ pub fn update_all_with_base_url(base_url: &str) -> Result<UpdateResult> {
     })
 }
 
+/// Downloads or updates the WildFly images configuration from the default GitHub URL.
 pub fn update_images() -> Result<UpdateStatus> {
     update_images_with_base_url(DEFAULT_BASE_URL)
 }
 
+/// Downloads or updates the WildFly images configuration from a custom base URL.
 pub fn update_images_with_base_url(base_url: &str) -> Result<UpdateStatus> {
     let url = format!("{}/{}", base_url, IMAGES_FILENAME);
     let local_path = images_path();
@@ -142,10 +175,12 @@ pub fn update_images_with_base_url(base_url: &str) -> Result<UpdateStatus> {
     )
 }
 
+/// Downloads or updates the feature packs configuration from the default GitHub URL.
 pub fn update_feature_packs() -> Result<UpdateStatus> {
     update_feature_packs_with_base_url(DEFAULT_BASE_URL)
 }
 
+/// Downloads or updates the feature packs configuration from a custom base URL.
 pub fn update_feature_packs_with_base_url(base_url: &str) -> Result<UpdateStatus> {
     let url = format!("{}/{}", base_url, FEATURE_PACKS_FILENAME);
     let local_path = feature_packs_path();

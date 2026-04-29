@@ -1,3 +1,5 @@
+//! Galleon feature pack metadata and registry.
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
@@ -9,27 +11,43 @@ use crate::update::feature_packs_path;
 
 const FP_PORT_OFFSET_BASE: u16 = 10_000;
 
+/// A WildFly Galleon feature pack with Maven coordinates and version metadata.
+///
+/// Feature packs extend WildFly with additional capabilities (e.g. AI, GraphQL, gRPC).
+/// Each feature pack has a short alias (`shortcut`) used in the version expression DSL
+/// and Maven coordinates for downloading the documentation archive.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FeaturePack {
+    /// Short alias used in the DSL (e.g. `"ai"`, `"graphql"`).
     pub shortcut: String,
+    /// Human-readable name (e.g. `"AI"`, `"GraphQL"`).
     pub name: String,
+    /// Maven group ID (e.g. `"org.wildfly.generative-ai"`).
     pub group_id: String,
+    /// Maven artifact ID (e.g. `"wildfly-ai-feature-pack"`).
     pub artifact_id: String,
+    /// Zero-based index assigned to this shortcut, used for port offset computation.
     pub shortcut_index: u16,
+    /// Zero-based index of this version within its shortcut group.
     pub version_index: u16,
+    /// Display version string (e.g. `"0.9.0"`).
     pub version: String,
+    /// Maven version string, which may differ from the display version (e.g. `"2.7.0.Final"`).
     pub maven_version: String,
 }
 
 impl FeaturePack {
+    /// Returns a unique port offset for this feature pack, starting at `10_000`.
     pub fn port_offset(&self) -> u16 {
         FP_PORT_OFFSET_BASE + (self.shortcut_index * 100) + self.version_index
     }
 
+    /// Returns a container-safe identifier (e.g. `"ai-0-9-0"`).
     pub fn container_id(&self) -> String {
         format!("{}-{}", self.shortcut, self.version.replace('.', "-"))
     }
 
+    /// Returns the Maven Central URL for the feature pack's documentation ZIP archive.
     pub fn download_url(&self) -> String {
         let group_path = self.group_id.replace('.', "/");
         format!(
@@ -38,6 +56,7 @@ impl FeaturePack {
         )
     }
 
+    /// Returns a human-readable label (e.g. `"ai 0.9.0"`).
     pub fn display_name(&self) -> String {
         format!("{} {}", self.shortcut, self.version)
     }
@@ -59,20 +78,27 @@ pub(crate) struct FeaturePackEntry {
     pub maven_version: String,
 }
 
+/// Registry of [`FeaturePack`] entries loaded from a TOML configuration file.
+///
+/// Feature packs are stored in a [`BTreeMap`] keyed by `(shortcut, version)`, so iteration
+/// is alphabetical by shortcut and then by version within each shortcut group.
 pub struct FeaturePackRegistry {
     packs: BTreeMap<(String, String), FeaturePack>,
 }
 
 impl FeaturePackRegistry {
+    /// Loads the feature pack registry from the default configuration path (`~/.config/wildfly-meta/feature-packs.toml`).
     pub fn load_default() -> Result<Self> {
         Self::load(&feature_packs_path())
     }
 
+    /// Loads the feature pack registry from the given TOML file path.
     pub fn load(path: &Path) -> Result<Self> {
         let content = fs::read_to_string(path)?;
         Self::from_toml(&content)
     }
 
+    /// Parses the feature pack registry from a TOML string.
     pub fn from_toml(content: &str) -> Result<Self> {
         let config: FeaturePacksConfig = toml::from_str(content)?;
         let mut packs = BTreeMap::new();
@@ -109,14 +135,17 @@ impl FeaturePackRegistry {
         Ok(Self { packs })
     }
 
+    /// Returns an iterator over `(shortcut, version)` keys in sorted order.
     pub fn keys(&self) -> impl Iterator<Item = &(String, String)> {
         self.packs.keys()
     }
 
+    /// Returns the feature pack matching the given shortcut and version, or `None`.
     pub fn get(&self, shortcut: &str, version: &str) -> Option<&FeaturePack> {
         self.packs.get(&(shortcut.to_string(), version.to_string()))
     }
 
+    /// Returns the latest (last registered) version of the given shortcut, or `None`.
     pub fn latest(&self, shortcut: &str) -> Option<&FeaturePack> {
         self.packs
             .iter()
@@ -125,12 +154,14 @@ impl FeaturePackRegistry {
             .next_back()
     }
 
+    /// Returns the deduplicated list of known shortcut names in alphabetical order.
     pub fn known_shortcuts(&self) -> Vec<&str> {
         let mut shortcuts: Vec<&str> = self.packs.keys().map(|(s, _)| s.as_str()).collect();
         shortcuts.dedup();
         shortcuts
     }
 
+    /// Returns all known version strings for the given shortcut.
     pub fn known_versions(&self, shortcut: &str) -> Vec<&str> {
         self.packs
             .keys()
@@ -139,10 +170,12 @@ impl FeaturePackRegistry {
             .collect()
     }
 
+    /// Returns all feature packs in sorted order.
     pub fn all(&self) -> Vec<&FeaturePack> {
         self.packs.values().collect()
     }
 
+    /// Returns all identifiers: bare shortcuts (e.g. `"ai"`) and versioned forms (e.g. `"ai:0.9.0"`).
     pub fn all_identifiers(&self) -> Vec<String> {
         let mut ids: Vec<String> = self
             .known_shortcuts()
@@ -155,14 +188,17 @@ impl FeaturePackRegistry {
         ids
     }
 
+    /// Returns the number of feature packs in the registry.
     pub fn len(&self) -> usize {
         self.packs.len()
     }
 
+    /// Returns `true` if the registry contains no feature packs.
     pub fn is_empty(&self) -> bool {
         self.packs.is_empty()
     }
 
+    /// Reads and returns the `config_version` from the given TOML file without loading the full registry.
     pub fn config_version(path: &Path) -> Result<u32> {
         let content = fs::read_to_string(path)?;
         let config: FeaturePacksConfig = toml::from_str(&content)?;

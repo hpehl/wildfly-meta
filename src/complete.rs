@@ -1,12 +1,21 @@
+//! Shell completion support for version and feature pack identifiers.
+
 use crate::feature_pack::FeaturePackRegistry;
 use crate::image::{ImageRegistry, DEVELOPMENT_VERSION};
 use crate::parse::parse_image;
 
+/// Controls which kinds of completions are offered.
 pub struct CompletionOptions {
+    /// Whether to include feature pack shortcuts and versioned identifiers.
     pub feature_packs: bool,
+    /// Whether to offer range-based completions (e.g. `20..`).
     pub ranges: bool,
 }
 
+/// Returns all valid identifiers for shell completion.
+///
+/// Includes WildFly version numbers, `"dev"`, and optionally feature pack shortcuts
+/// and versioned identifiers (e.g. `"ai"`, `"ai:0.9.0"`).
 pub fn all_identifiers(
     images: &ImageRegistry,
     packs: &FeaturePackRegistry,
@@ -19,6 +28,10 @@ pub fn all_identifiers(
     ids
 }
 
+/// Returns completion suggestions for a partial input string.
+///
+/// Handles comma-separated lists and range expressions, returning fully-formed completion
+/// strings that include the prefix already typed by the user.
 pub fn suggest(
     input: &str,
     images: &ImageRegistry,

@@ -1,3 +1,8 @@
+//! Version expression parser supporting a mini-DSL for specifying WildFly images and feature packs.
+//!
+//! The DSL supports comma-separated items, version ranges (`20..25`), multipliers (`3x34`),
+//! and mixed references to both images and feature packs (e.g. `"3x10,23..26,5x28,34,dev,ai"`).
+
 use std::cmp::Ordering;
 
 use anyhow::{bail, Result};
@@ -7,13 +12,17 @@ use crate::feature_pack::FeaturePackRegistry;
 use crate::image::{identifier, wildfly_dev, ImageRegistry, WildFlyImage, DEVELOPMENT_VERSION};
 use crate::FeaturePack;
 
+/// A parsed metadata item — either a WildFly container image or a Galleon feature pack.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MetaItem {
+    /// A WildFly container image.
     Image(WildFlyImage),
+    /// A Galleon feature pack.
     FeaturePack(FeaturePack),
 }
 
 impl MetaItem {
+    /// Returns a human-readable name for this item (e.g. `"34.0"` or `"ai 0.9.0"`).
     pub fn display_name(&self) -> String {
         match self {
             MetaItem::Image(img) => img.display_version(),
@@ -21,6 +30,7 @@ impl MetaItem {
         }
     }
 
+    /// Returns the port offset used to assign unique ports to this item.
     pub fn port_offset(&self) -> u16 {
         match self {
             MetaItem::Image(img) => img.identifier,
@@ -28,6 +38,7 @@ impl MetaItem {
         }
     }
 
+    /// Returns a unique container identifier (e.g. `"340"` or `"ai-0-9-0"`).
     pub fn container_id(&self) -> String {
         match self {
             MetaItem::Image(img) => img.identifier.to_string(),
@@ -35,6 +46,7 @@ impl MetaItem {
         }
     }
 
+    /// Returns `"wildfly"` for images or `"feature-pack"` for feature packs.
     pub fn source_type(&self) -> &'static str {
         match self {
             MetaItem::Image(_) => "wildfly",
@@ -42,6 +54,7 @@ impl MetaItem {
         }
     }
 
+    /// Returns a re-parseable source name (e.g. `"34.0"` or `"ai:0.9.0"`).
     pub fn source_name(&self) -> String {
         match self {
             MetaItem::Image(img) => img.display_version(),
@@ -49,6 +62,7 @@ impl MetaItem {
         }
     }
 
+    /// Returns a greeting-style label (e.g. `"WildFly 34.0"` or `"AI Feature Pack 0.9.0"`).
     pub fn welcome_label(&self) -> String {
         match self {
             MetaItem::Image(img) => format!("WildFly {}", img.display_version()),
@@ -59,12 +73,16 @@ impl MetaItem {
     }
 }
 
+/// Controls which DSL features are enabled during parsing.
 pub struct ParseOptions {
+    /// Whether range expressions like `20..25` are allowed.
     pub ranges: bool,
+    /// Whether multiplier prefixes like `3x34` are allowed.
     pub multipliers: bool,
 }
 
 impl ParseOptions {
+    /// Enables all DSL features (ranges and multipliers).
     pub fn all() -> Self {
         Self {
             ranges: true,
@@ -72,6 +90,7 @@ impl ParseOptions {
         }
     }
 
+    /// Disables all DSL features — only plain version and feature pack references are accepted.
     pub fn none() -> Self {
         Self {
             ranges: false,
@@ -86,6 +105,10 @@ impl Default for ParseOptions {
     }
 }
 
+/// Parses a single version string into a [`WildFlyImage`].
+///
+/// Accepts `"dev"` for the development build, a two-digit major version (e.g. `"34"`),
+/// or a `major.minor` form (e.g. `"26.1"`).
 pub fn parse_image(input: &str, registry: &ImageRegistry) -> Result<WildFlyImage> {
     let version_re = Regex::new(r"^(?<major>[0-9]{2})(?<dot>\.)?(?<minor>[0-9])?$").unwrap();
     if input == DEVELOPMENT_VERSION {
@@ -113,6 +136,10 @@ pub fn parse_image(input: &str, registry: &ImageRegistry) -> Result<WildFlyImage
     }
 }
 
+/// Parses a feature pack reference into a [`FeaturePack`].
+///
+/// Accepts a bare shortcut (e.g. `"ai"`) to select the latest version, or a versioned form
+/// (e.g. `"ai:0.9.0"`) to select a specific version.
 pub fn parse_feature_pack(input: &str, registry: &FeaturePackRegistry) -> Result<FeaturePack> {
     if let Some((shortcut, version)) = input.split_once(':') {
         match registry.get(shortcut, version) {
@@ -147,6 +174,9 @@ pub fn parse_feature_pack(input: &str, registry: &FeaturePackRegistry) -> Result
     }
 }
 
+/// Parses a single input string as either a feature pack or an image.
+///
+/// Feature pack lookup is tried first; if it fails, the input is parsed as an image version.
 pub fn parse_item(
     input: &str,
     images: &ImageRegistry,
@@ -158,6 +188,21 @@ pub fn parse_item(
     parse_image(input, images).map(MetaItem::Image)
 }
 
+/// Parses a comma-separated list of version expressions into a sorted list of [`MetaItem`]s.
+///
+/// Supports the full mini-DSL including ranges (`20..25`), multipliers (`3x34`), feature pack
+/// references (`ai`, `grpc:0.1.16`), and the development build (`dev`). The returned list
+/// is sorted by port offset.
+///
+/// # Example
+///
+/// ```
+/// # use wildfly_meta::*;
+/// # let images = ImageRegistry::from_toml(include_str!("../wildfly-images.toml")).unwrap();
+/// # let packs = FeaturePackRegistry::from_toml(include_str!("../feature-packs.toml")).unwrap();
+/// let items = parse_list("3x10,23..26,34,dev,ai", &images, &packs, &ParseOptions::all()).unwrap();
+/// assert!(items.len() >= 10);
+/// ```
 pub fn parse_list(
     input: &str,
     images: &ImageRegistry,
