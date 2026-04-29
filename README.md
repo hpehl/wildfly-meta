@@ -1,72 +1,294 @@
-# WildFly Container Versions
+# WildFly Meta
 
-A library for managing WildFly container versions deployed at https://hub.docker.com/r/jboss/wildfly and
-https://quay.io/repository/wildfly/wildfly.
+A Rust library for managing WildFly metadata: container images, feature packs, and version expression parsing.
 
-The library contains a struct describing WildFly container versions and various functions to parse expressions that are either
-short versions, multipliers, ranges, enumerations, or a combination of them.
+Data is loaded from TOML configuration files stored in `~/.config/wildfly-meta/` and downloaded on demand from GitHub. The library is consumed by Rust-based CLI tools such as [wado](https://github.com/hpehl/wado) and [mgt](https://github.com/hpehl/wildfly-model-graph).
 
-The library is consumed by Rust-based CLI tools that deal with WildFly containers such as [wado](https://github.com/hpehl/wado).
+## Quick Start
 
-```rust
-use semver::Version;
+Add the dependency to your `Cargo.toml`:
 
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
-pub struct WildFlyContainer {
-    pub identifier: u16,
-    pub version: Version,
-    pub short_version: String,
-    pub core_version: Version,
-    pub suffix: String,
-    pub repository: String,
-    pub platforms: Vec<String>,
-}
+```toml
+[dependencies]
+wildfly_meta = "0.1"
 ```
 
 ```rust
 use anyhow::Result;
-use wildfly_container_versions::WildFlyContainer;
+use wildfly_meta::{
+    update_all, ImageRegistry, FeaturePackRegistry,
+    parse_list, ParseOptions, MetaItem,
+};
 
 fn main() -> Result<()> {
-    let enumeration: Vec<WildFlyContainer> = WildFlyContainer::enumeration("3x10,23..26,5x28,34")?;
-    let range: Vec<WildFlyContainer> = WildFlyContainer::range("26.1..29")?;
-    let versions: Vec<WildFlyContainer> = WildFlyContainer::versions("2x33")?;
-    let version: WildFlyContainer = WildFlyContainer::version("35")?;
-    let lookup: WildFlyContainer = WildFlyContainer::lookup(340)?;
+    // Download / update configuration files
+    let result = update_all()?;
+    println!("{}", result.summary());
+
+    // Load registries
+    let images = ImageRegistry::load_default()?;
+    let packs = FeaturePackRegistry::load_default()?;
+
+    // Parse a mixed expression
+    let items = parse_list("34,35,ai", &images, &packs, &ParseOptions::all())?;
+    for item in &items {
+        println!("{}", item.welcome_label());
+    }
     Ok(())
 }
 ```
 
-## Version Expressions
+## Container Images
 
-Version expressions are either short versions, multipliers, ranges, enumerations, or a combination of them. They follow
-this [BNF](https://bnfplayground.pauliankline.com/?bnf=%3Cexpression%3E%20%3A%3A%3D%20%3Cexpression%3E%20%22%2C%22%20%3Celement%3E%20%7C%20%3Celement%3E%0A%3Celement%3E%20%3A%3A%3D%20%3Cmultiplier%3E%20%22x%22%20%3Crange%3E%20%7C%20%3Cmultiplier%3E%20%22x%22%20%3Cshort_version%3E%20%7C%20%3Crange%3E%20%7C%20%3Cshort_version%3E%0A%3Crange%3E%20%3A%3A%3D%20%3Cshort_version%3E%20%22..%22%20%3Cshort_version%3E%20%7C%20%22..%22%20%3Cshort_version%3E%20%7C%20%3Cshort_version%3E%20%22..%22%20%7C%20%22..%22%0A%3Cmultiplier%3E%20%3A%3A%3D%20%3Cnonzero_number%3E%20%7C%20%3Ctwo_digit_number%3E%0A%3Cshort_version%3E%20%3A%3A%3D%20%3Cmajor%3E%20%7C%20%3Cmajor%3E%20%22.%22%20%3Cminor%3E%0A%3Cmajor%3E%20%3A%3A%3D%20%3Ctwo_digit_number%3E%20%7C%20%3Cthree_digit_number%3E%0A%3Cminor%3E%20%3A%3A%3D%20%3Cnonzero_number%3E%20%7C%20%3Ctwo_digit_number%3E%0A%3Cthree_digit_number%3E%20%3A%3A%3D%20%3Cnonzero_number%3E%20%3Cnumber%3E%20%3Cnumber%3E%0A%3Ctwo_digit_number%3E%20%3A%3A%3D%20%3Cnonzero_number%3E%20%3Cnumber%3E%0A%3Cnumber%3E%20%3A%3A%3D%20%220%22%20%7C%20%221%22%20%7C%20%222%22%20%7C%20%223%22%20%7C%20%224%22%20%7C%20%225%22%20%7C%20%226%22%20%7C%20%227%22%20%7C%20%228%22%20%7C%20%229%22%0A%3Cnonzero_number%3E%20%3A%3A%3D%20%221%22%20%7C%20%222%22%20%7C%20%223%22%20%7C%20%224%22%20%7C%20%225%22%20%7C%20%226%22%20%7C%20%227%22%20%7C%20%228%22%20%7C%20%229%22%0A&name=WildFly%20Container%20Versions):
+Container images represent WildFly versions deployed at [Docker Hub](https://hub.docker.com/r/jboss/wildfly) and [Quay.io](https://quay.io/repository/wildfly/wildfly).
 
+### `WildFlyImage`
+
+```rust
+pub struct WildFlyImage {
+    pub identifier: u16,          // numeric ID (major * 10 + minor)
+    pub version: Version,         // full semver (e.g. 26.1.3)
+    pub short_version: String,    // display version (e.g. "26.1")
+    pub core_version: Version,    // WildFly Core version
+    pub suffix: String,           // tag suffix (e.g. "Final-jdk21")
+    pub repository: String,       // container registry URL
+    pub platforms: Vec<String>,   // supported platforms
+}
 ```
-<expression> ::= <expression> "," <element> | <element>
-<element> ::= <multiplier> "x" <range> | <multiplier> "x" <short_version> | <range> | <short_version>
-<range> ::= <short_version> ".." <short_version> | ".." <short_version> | <short_version> ".." | ".."
-<multiplier> ::= <nonzero_number> | <two_digit_number>
-<short_version> ::= <major> | <major> "." <minor>
-<major> ::= <two_digit_number> | <three_digit_number>
-<minor> ::= <nonzero_number> | <two_digit_number>
-<three_digit_number> ::= <nonzero_number> <number> <number>
-<two_digit_number> ::= <nonzero_number> <number>
-<number> ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
-<nonzero_number> ::= "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+
+Key methods:
+
+| Method | Description |
+|--------|-------------|
+| `image_name()` | Full image reference (e.g. `quay.io/wildfly/wildfly:35.0.1.Final-jdk21`) |
+| `is_dev()` | `true` for the development version |
+| `display_version()` | `"dev"` or the short version string |
+| `http_port()` | Computed HTTP port (8000 + offset) |
+| `management_port()` | Computed management port (9000 + offset) |
+
+### `ImageRegistry`
+
+Loads and queries images from `wildfly-images.toml`.
+
+```rust
+let images = ImageRegistry::load_default()?;        // from ~/.config/wildfly-meta/
+let images = ImageRegistry::load(Path::new("…"))?;  // from custom path
+let images = ImageRegistry::from_toml(content)?;     // from TOML string
+
+let img = images.get(350);                           // lookup by identifier
+let first = images.first();                          // oldest version
+let last = images.last();                            // newest version
+let range = images.range(260, 290);                  // versions 26.0 – 29.0
+let all = images.all();                              // all versions
 ```
 
-### Examples
+### Helper Functions
 
-- 10
-- 26.1
-- 3x35
-- 23..33
-- 25..
-- ..26.1
-- ..
-- 5x33..35
-- 20,25..29,2x31,3x32,4x33..35
+- `wildfly_dev()` — creates the special development `WildFlyImage` instance
+- `identifier(major, minor)` — computes the numeric identifier (`major * 10 + minor`)
+
+## Feature Packs
+
+Feature packs represent WildFly Galleon feature packs with Maven coordinates.
+
+### `FeaturePack`
+
+```rust
+pub struct FeaturePack {
+    pub shortcut: String,        // short name (e.g. "ai", "graphql")
+    pub name: String,            // display name (e.g. "AI", "GraphQL")
+    pub group_id: String,        // Maven group ID
+    pub artifact_id: String,     // Maven artifact ID
+    pub version: String,         // version string
+    pub maven_version: String,   // Maven artifact version
+    pub shortcut_index: u16,     // computed index for port offset
+    pub version_index: u16,      // version sequence number
+}
+```
+
+Key methods:
+
+| Method | Description |
+|--------|-------------|
+| `port_offset()` | Computed port offset (10000 + shortcut_index * 100 + version_index) |
+| `container_id()` | Container identifier (e.g. `ai-0-9-0`) |
+| `download_url()` | Maven Central URL for the doc archive |
+| `display_name()` | `"shortcut version"` format |
+
+### `FeaturePackRegistry`
+
+Loads and queries feature packs from `feature-packs.toml`.
+
+```rust
+let packs = FeaturePackRegistry::load_default()?;
+
+let fp = packs.get("ai", "0.9.0");          // lookup by shortcut + version
+let latest = packs.latest("ai");            // latest version of a shortcut
+let shortcuts = packs.known_shortcuts();     // all unique shortcuts
+let versions = packs.known_versions("ai");   // all versions for a shortcut
+let all = packs.all();                       // all feature packs
+let ids = packs.all_identifiers();           // all "shortcut" and "shortcut:version" strings
+```
+
+## Parsing
+
+The library provides parsing functions for version expressions that can reference both container images and feature packs.
+
+### Single Items
+
+```rust
+use wildfly_meta::{parse_image, parse_feature_pack, parse_item};
+
+// Parse a single image: "dev", "34", or "26.1"
+let img = parse_image("34", &images)?;
+
+// Parse a single feature pack: "ai" (latest) or "ai:0.9.0" (specific version)
+let fp = parse_feature_pack("ai", &packs)?;
+
+// Parse either type (feature packs take priority on name collision)
+let item = parse_item("ai", &images, &packs)?;
+```
+
+### Lists and Expressions
+
+`parse_list` parses comma-separated expressions with optional support for ranges (`..`) and multipliers (`Nx`), controlled by `ParseOptions`:
+
+```rust
+use wildfly_meta::{parse_list, ParseOptions};
+
+let options = ParseOptions::all();  // enable ranges and multipliers
+
+// Plain versions and feature packs
+let items = parse_list("34,35,ai", &images, &packs, &options)?;
+
+// Ranges: all versions from 23 to 26
+let items = parse_list("23..26", &images, &packs, &options)?;
+
+// Open ranges: from 30 to newest, or oldest to 26
+let items = parse_list("30..", &images, &packs, &options)?;
+let items = parse_list("..26", &images, &packs, &options)?;
+
+// Multipliers: three copies of version 34
+let items = parse_list("3x34", &images, &packs, &options)?;
+
+// Complex mixed expression
+let items = parse_list("3x10,23..26,5x28,34,dev,ai", &images, &packs, &options)?;
+```
+
+`ParseOptions` controls which syntax elements are enabled:
+
+| Option | Enables |
+|--------|---------|
+| `ParseOptions::all()` | Ranges and multipliers |
+| `ParseOptions::none()` | Plain versions and feature packs only |
+
+### `MetaItem`
+
+`MetaItem` is the unified enum returned by `parse_item` and `parse_list`:
+
+```rust
+pub enum MetaItem {
+    Image(WildFlyImage),
+    FeaturePack(FeaturePack),
+}
+```
+
+| Method | Description |
+|--------|-------------|
+| `display_name()` | Display string for the item |
+| `port_offset()` | Port offset (identifier for images, computed for feature packs) |
+| `container_id()` | Container identifier |
+| `source_type()` | `"wildfly"` or `"feature-pack"` |
+| `source_name()` | Parseable name (version or `shortcut:version`) |
+| `welcome_label()` | Human-readable label (e.g. `"WildFly 34"` or `"AI Feature Pack 0.9.0"`) |
+
+## Configuration Update
+
+Configuration files are downloaded from the [wildfly-meta](https://github.com/hpehl/wildfly-meta) repository on GitHub and stored in `~/.config/wildfly-meta/`. A `config_version` field in each TOML file controls whether a re-download is needed.
+
+```rust
+use wildfly_meta::{update_all, update_images, update_feature_packs, UpdateStatus};
+
+// Update both files at once
+let result = update_all()?;
+println!("{}", result.summary());
+
+// Update individually
+let status = update_images()?;
+match status {
+    UpdateStatus::Downloaded { version, count } => { /* first download */ }
+    UpdateStatus::Updated { from_version, to_version, diff } => {
+        println!("Added: {:?}", diff.added);
+        println!("Removed: {:?}", diff.removed);
+    }
+    UpdateStatus::AlreadyUpToDate(version) => { /* no changes */ }
+}
+```
+
+Path helpers:
+
+| Function | Returns |
+|----------|---------|
+| `config_dir()` | `~/.config/wildfly-meta` |
+| `images_path()` | `~/.config/wildfly-meta/wildfly-images.toml` |
+| `feature_packs_path()` | `~/.config/wildfly-meta/feature-packs.toml` |
+
+## Shell Completion
+
+The library provides helpers for implementing shell tab-completion in CLI tools.
+
+```rust
+use wildfly_meta::{all_identifiers, suggest, CompletionOptions};
+
+let options = CompletionOptions {
+    feature_packs: true,
+    ranges: true,
+};
+
+// Get all available identifiers for completion
+let ids = all_identifiers(&images, &packs, &options);
+
+// Get context-aware suggestions for partial input
+let suggestions = suggest("34,", &images, &packs, &options);   // fresh after comma
+let suggestions = suggest("20..", &images, &packs, &options);   // range completion
+```
+
+## Data Files
+
+Two TOML files in the repository root serve as the canonical data source:
+
+### `wildfly-images.toml`
+
+```toml
+config_version = 5
+
+[[images]]
+major = 35
+minor = 0
+version = "35.0.1"
+core_version = "27.0.1"
+suffix = "Final-jdk21"
+repository = "quay.io/wildfly/wildfly"
+platforms = ["linux/amd64", "linux/arm64", "linux/s390x", "linux/ppc64le"]
+```
+
+To add a new WildFly version, append an `[[images]]` entry and increment `config_version`. No code changes or library release needed.
+
+### `feature-packs.toml`
+
+```toml
+config_version = 3
+
+[[feature_packs]]
+shortcut = "ai"
+name = "AI"
+group_id = "org.wildfly.generative-ai"
+artifact_id = "wildfly-ai-feature-pack"
+version = "0.9.0"
+maven_version = "0.9.0"
+```
+
+To add a new feature pack, append a `[[feature_packs]]` entry and increment `config_version`. `shortcut_index` and `version_index` are computed at load time from TOML order.
 
 ## Supported Versions
 
