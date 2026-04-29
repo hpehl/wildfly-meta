@@ -103,6 +103,10 @@ impl FeaturePackRegistry {
         Ok(Self { packs })
     }
 
+    pub fn keys(&self) -> impl Iterator<Item = &(String, String)> {
+        self.packs.keys()
+    }
+
     pub fn get(&self, shortcut: &str, version: &str) -> Option<&FeaturePack> {
         self.packs.get(&(shortcut.to_string(), version.to_string()))
     }

@@ -16,5 +16,6 @@ pub use parse::{parse_feature_pack, parse_image, parse_item, parse_list, MetaIte
 pub use update::{
     config_dir, feature_packs_path, images_path, update_all, update_all_with_base_url,
     update_feature_packs, update_feature_packs_with_base_url, update_images,
-    update_images_with_base_url, UpdateStatus, FEATURE_PACKS_FILENAME, IMAGES_FILENAME,
+    update_images_with_base_url, UpdateDiff, UpdateResult, UpdateStatus, FEATURE_PACKS_FILENAME,
+    IMAGES_FILENAME,
 };

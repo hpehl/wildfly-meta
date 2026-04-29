@@ -160,6 +160,10 @@ impl ImageRegistry {
         self.images.is_empty()
     }
 
+    pub fn keys(&self) -> impl Iterator<Item = &u16> {
+        self.images.keys()
+    }
+
     pub fn config_version(path: &Path) -> Result<u32> {
         let content = fs::read_to_string(path)?;
         let config: WildFlyImagesConfig = toml::from_str(&content)?;
