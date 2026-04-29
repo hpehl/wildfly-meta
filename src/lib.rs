@@ -3,11 +3,13 @@
 //! Data is loaded from TOML configuration files stored in `~/.config/wildfly-meta/`.
 //! Use [`update_all`] to download the latest configuration from GitHub.
 
+mod complete;
 mod feature_pack;
 mod image;
 mod parse;
 mod update;
 
+pub use complete::{all_identifiers, suggest, CompletionOptions};
 pub use feature_pack::{FeaturePack, FeaturePackRegistry};
 pub use image::{
     identifier, wildfly_dev, ImageRegistry, WildFlyImage, DEVELOPMENT_TAG, DEVELOPMENT_VERSION,
