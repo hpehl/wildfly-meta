@@ -10,69 +10,11 @@ use anyhow::{bail, Result};
 use regex::Regex;
 
 use crate::feature_pack::FeaturePackRegistry;
-use crate::image::{identifier, wildfly_dev, ImageRegistry, WildFlyImage, DEVELOPMENT_VERSION};
+use crate::meta_item::MetaItem;
+use crate::wildfly_image::{
+    identifier, wildfly_dev, WildFlyImage, WildFlyImageRegistry, DEVELOPMENT_VERSION,
+};
 use crate::FeaturePack;
-
-/// A parsed metadata item — either a WildFly container image or a Galleon feature pack.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum MetaItem {
-    /// A WildFly container image.
-    Image(WildFlyImage),
-    /// A Galleon feature pack.
-    FeaturePack(FeaturePack),
-}
-
-impl MetaItem {
-    /// Returns a human-readable name for this item (e.g. `"34.0"` or `"ai 0.9.0"`).
-    pub fn display_name(&self) -> String {
-        match self {
-            MetaItem::Image(img) => img.display_version(),
-            MetaItem::FeaturePack(fp) => fp.display_name(),
-        }
-    }
-
-    /// Returns the port offset used to assign unique ports to this item.
-    pub fn port_offset(&self) -> u16 {
-        match self {
-            MetaItem::Image(img) => img.identifier,
-            MetaItem::FeaturePack(fp) => fp.port_offset(),
-        }
-    }
-
-    /// Returns a unique container identifier (e.g. `"340"` or `"ai-0-9-0"`).
-    pub fn container_id(&self) -> String {
-        match self {
-            MetaItem::Image(img) => img.identifier.to_string(),
-            MetaItem::FeaturePack(fp) => fp.container_id(),
-        }
-    }
-
-    /// Returns `"wildfly"` for images or `"feature-pack"` for feature packs.
-    pub fn source_type(&self) -> &'static str {
-        match self {
-            MetaItem::Image(_) => "wildfly",
-            MetaItem::FeaturePack(_) => "feature-pack",
-        }
-    }
-
-    /// Returns a re-parseable source name (e.g. `"34.0"` or `"ai:0.9.0"`).
-    pub fn source_name(&self) -> String {
-        match self {
-            MetaItem::Image(img) => img.display_version(),
-            MetaItem::FeaturePack(fp) => format!("{}:{}", fp.shortcut, fp.version),
-        }
-    }
-
-    /// Returns a greeting-style label (e.g. `"WildFly 34.0"` or `"AI Feature Pack 0.9.0"`).
-    pub fn welcome_label(&self) -> String {
-        match self {
-            MetaItem::Image(img) => format!("WildFly {}", img.display_version()),
-            MetaItem::FeaturePack(fp) => {
-                format!("{} Feature Pack {}", fp.name, fp.version)
-            }
-        }
-    }
-}
 
 /// Controls which DSL features are enabled during parsing.
 pub struct ParseOptions {
@@ -113,7 +55,7 @@ impl Default for ParseOptions {
 static VERSION_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^(?<major>[0-9]{2})(?<dot>\.)?(?<minor>[0-9])?$").unwrap());
 
-pub fn parse_image(input: &str, registry: &ImageRegistry) -> Result<WildFlyImage> {
+pub fn parse_image(input: &str, registry: &WildFlyImageRegistry) -> Result<WildFlyImage> {
     if input == DEVELOPMENT_VERSION {
         Ok(wildfly_dev())
     } else {
@@ -182,7 +124,7 @@ pub fn parse_feature_pack(input: &str, registry: &FeaturePackRegistry) -> Result
 /// Feature pack lookup is tried first; if it fails, the input is parsed as an image version.
 pub fn parse_item(
     input: &str,
-    images: &ImageRegistry,
+    images: &WildFlyImageRegistry,
     packs: &FeaturePackRegistry,
 ) -> Result<MetaItem> {
     if let Ok(fp) = parse_feature_pack(input, packs) {
@@ -201,14 +143,17 @@ pub fn parse_item(
 ///
 /// ```
 /// # use wildfly_meta::*;
-/// # let images = ImageRegistry::from_toml(include_str!("../wildfly-images.toml")).unwrap();
+/// # let images = WildFlyImageRegistry::from_toml(include_str!("../wildfly-images.toml")).unwrap();
 /// # let packs = FeaturePackRegistry::from_toml(include_str!("../feature-packs.toml")).unwrap();
 /// let items = parse_list("3x10,23..26,34,dev,ai", &images, &packs, &ParseOptions::all()).unwrap();
+/// for item in &items {
+///     println!("{} ({})", item.short_name(), item.kind());
+/// }
 /// assert!(items.len() >= 10);
 /// ```
 pub fn parse_list(
     input: &str,
-    images: &ImageRegistry,
+    images: &WildFlyImageRegistry,
     packs: &FeaturePackRegistry,
     options: &ParseOptions,
 ) -> Result<Vec<MetaItem>> {
@@ -251,7 +196,7 @@ pub fn parse_list(
 
 fn parse_range(
     range: &str,
-    images: &ImageRegistry,
+    images: &WildFlyImageRegistry,
     options: &ParseOptions,
 ) -> Result<Vec<MetaItem>> {
     let (multiplier, range) = if options.multipliers {
@@ -297,7 +242,7 @@ fn parse_range(
 
 fn parse_with_multiplier(
     input: &str,
-    images: &ImageRegistry,
+    images: &WildFlyImageRegistry,
     packs: &FeaturePackRegistry,
 ) -> Result<Vec<MetaItem>> {
     let (multiplier, value) = match extract_multiplier(input) {
@@ -328,8 +273,8 @@ fn extract_multiplier(input: &str) -> Option<(u16, &str)> {
 mod tests {
     use super::*;
 
-    fn image_registry() -> ImageRegistry {
-        ImageRegistry::from_toml(include_str!("../wildfly-images.toml")).unwrap()
+    fn image_registry() -> WildFlyImageRegistry {
+        WildFlyImageRegistry::from_toml(include_str!("../wildfly-images.toml")).unwrap()
     }
 
     fn fp_registry() -> FeaturePackRegistry {
@@ -459,7 +404,7 @@ mod tests {
         let imgs = image_registry();
         let fps = fp_registry();
         let item = parse_item("ai", &imgs, &fps).unwrap();
-        assert_eq!(item.source_type(), "feature-pack");
+        assert_eq!(item.kind(), "feature-pack");
     }
 
     // ------------------------------------------------------ parse_list: basic
@@ -470,7 +415,7 @@ mod tests {
         let fps = fp_registry();
         let items = parse_list("25", &imgs, &fps, &ParseOptions::none()).unwrap();
         assert_eq!(items.len(), 1);
-        assert_eq!(items[0].display_name(), "25.0");
+        assert_eq!(items[0].short_name(), "25.0");
     }
 
     #[test]
@@ -597,7 +542,7 @@ mod tests {
         let fps = fp_registry();
         let items = parse_list("25..25", &imgs, &fps, &ParseOptions::all()).unwrap();
         assert_eq!(items.len(), 1);
-        assert_eq!(items[0].display_name(), "25.0");
+        assert_eq!(items[0].short_name(), "25.0");
     }
 
     #[test]
@@ -635,7 +580,7 @@ mod tests {
         let fps = fp_registry();
         let items = parse_list("3x34", &imgs, &fps, &ParseOptions::all()).unwrap();
         assert_eq!(items.len(), 3);
-        assert!(items.iter().all(|i| i.display_name() == "34.0"));
+        assert!(items.iter().all(|i| i.short_name() == "34.0"));
     }
 
     #[test]
@@ -692,52 +637,52 @@ mod tests {
     // ------------------------------------------------------ meta item
 
     #[test]
-    fn meta_item_display_name_feature_pack() {
+    fn meta_item_short_name_feature_pack() {
         let fps = fp_registry();
         let fp = parse_feature_pack("ai", &fps).unwrap();
         let item = MetaItem::FeaturePack(fp);
-        assert_eq!(item.display_name(), "ai 0.9.0");
+        assert_eq!(item.short_name(), "ai 0.9.0");
     }
 
     #[test]
-    fn meta_item_source_type() {
+    fn meta_item_kind() {
         let imgs = image_registry();
         let fps = fp_registry();
         let wf = parse_item("34", &imgs, &fps).unwrap();
-        assert_eq!(wf.source_type(), "wildfly");
+        assert_eq!(wf.kind(), "wildfly");
         let fp = parse_item("ai", &imgs, &fps).unwrap();
-        assert_eq!(fp.source_type(), "feature-pack");
+        assert_eq!(fp.kind(), "feature-pack");
     }
 
     #[test]
-    fn meta_item_source_name_roundtrip() {
+    fn meta_item_expression_roundtrip() {
         let imgs = image_registry();
         let fps = fp_registry();
         for input in &["34", "26.1", "ai", "grpc"] {
             let item = parse_item(input, &imgs, &fps).unwrap();
-            let reparsed = parse_item(&item.source_name(), &imgs, &fps).unwrap();
+            let reparsed = parse_item(&item.expression(), &imgs, &fps).unwrap();
             assert_eq!(item, reparsed);
         }
     }
 
     #[test]
-    fn meta_item_welcome_label() {
+    fn meta_item_full_name() {
         let imgs = image_registry();
         let fps = fp_registry();
         let wf = parse_item("34", &imgs, &fps).unwrap();
-        assert_eq!(wf.welcome_label(), "WildFly 34.0");
+        assert_eq!(wf.full_name(), "WildFly 34.0");
         let fp = parse_item("ai", &imgs, &fps).unwrap();
-        assert_eq!(fp.welcome_label(), "AI Feature Pack 0.9.0");
+        assert_eq!(fp.full_name(), "AI Feature Pack 0.9.0");
     }
 
     #[test]
-    fn meta_item_container_id() {
+    fn meta_item_container_name() {
         let imgs = image_registry();
         let fps = fp_registry();
         let wf = parse_item("34", &imgs, &fps).unwrap();
-        assert_eq!(wf.container_id(), "340");
+        assert_eq!(wf.container_name(), "340");
         let fp = parse_item("ai", &imgs, &fps).unwrap();
-        assert_eq!(fp.container_id(), "ai-0-9-0");
+        assert_eq!(fp.container_name(), "ai-0-9-0");
     }
 
     #[test]

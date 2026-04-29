@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Result};
 
 use crate::feature_pack::{FeaturePackRegistry, FeaturePacksConfig};
-use crate::image::{ImageRegistry, WildFlyImagesConfig};
+use crate::wildfly_image::{WildFlyImageRegistry, WildFlyImagesConfig};
 
 const DEFAULT_BASE_URL: &str = "https://raw.githubusercontent.com/hpehl/wildfly-meta/main";
 
@@ -148,8 +148,8 @@ pub fn update_images_with_base_url(base_url: &str) -> Result<UpdateStatus> {
             Ok((config.config_version, config.images.len()))
         },
         |old_content, new_content| {
-            let old_registry = ImageRegistry::from_toml(old_content);
-            let new_registry = ImageRegistry::from_toml(new_content);
+            let old_registry = WildFlyImageRegistry::from_toml(old_content);
+            let new_registry = WildFlyImageRegistry::from_toml(new_content);
             match (old_registry, new_registry) {
                 (Ok(old_reg), Ok(new_reg)) => {
                     let old_keys: BTreeSet<u16> = old_reg.keys().copied().collect();
@@ -157,12 +157,12 @@ pub fn update_images_with_base_url(base_url: &str) -> Result<UpdateStatus> {
                     let added = new_keys
                         .difference(&old_keys)
                         .filter_map(|k| new_reg.get(*k))
-                        .map(|img| format!("WildFly {}", img.display_version()))
+                        .map(|img| img.full_name())
                         .collect();
                     let removed = old_keys
                         .difference(&new_keys)
                         .filter_map(|k| old_reg.get(*k))
-                        .map(|img| format!("WildFly {}", img.display_version()))
+                        .map(|img| img.full_name())
                         .collect();
                     UpdateDiff { added, removed }
                 }
@@ -201,12 +201,12 @@ pub fn update_feature_packs_with_base_url(base_url: &str) -> Result<UpdateStatus
                     let added = new_keys
                         .difference(&old_keys)
                         .filter_map(|(s, v)| new_reg.get(s, v))
-                        .map(|fp| fp.display_name())
+                        .map(|fp| fp.short_name())
                         .collect();
                     let removed = old_keys
                         .difference(&new_keys)
                         .filter_map(|(s, v)| old_reg.get(s, v))
-                        .map(|fp| fp.display_name())
+                        .map(|fp| fp.short_name())
                         .collect();
                     UpdateDiff { added, removed }
                 }
@@ -413,20 +413,20 @@ suffix = "Final"
 repository = "quay.io/wildfly/wildfly"
 "#;
 
-        let old_reg = ImageRegistry::from_toml(old_toml).unwrap();
-        let new_reg = ImageRegistry::from_toml(new_toml).unwrap();
+        let old_reg = WildFlyImageRegistry::from_toml(old_toml).unwrap();
+        let new_reg = WildFlyImageRegistry::from_toml(new_toml).unwrap();
         let old_keys: BTreeSet<u16> = old_reg.keys().copied().collect();
         let new_keys: BTreeSet<u16> = new_reg.keys().copied().collect();
 
         let added: Vec<String> = new_keys
             .difference(&old_keys)
             .filter_map(|k| new_reg.get(*k))
-            .map(|img| format!("WildFly {}", img.display_version()))
+            .map(|img| img.full_name())
             .collect();
         let removed: Vec<String> = old_keys
             .difference(&new_keys)
             .filter_map(|k| old_reg.get(*k))
-            .map(|img| format!("WildFly {}", img.display_version()))
+            .map(|img| img.full_name())
             .collect();
 
         assert_eq!(added, vec!["WildFly 32.0"]);
@@ -483,12 +483,12 @@ maven_version = "1.0.0"
         let added: Vec<String> = new_keys
             .difference(&old_keys)
             .filter_map(|(s, v)| new_reg.get(s, v))
-            .map(|fp| fp.display_name())
+            .map(|fp| fp.short_name())
             .collect();
         let removed: Vec<String> = old_keys
             .difference(&new_keys)
             .filter_map(|(s, v)| old_reg.get(s, v))
-            .map(|fp| fp.display_name())
+            .map(|fp| fp.short_name())
             .collect();
 
         assert_eq!(added, vec!["ai 1.0.0"]);

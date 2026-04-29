@@ -10,26 +10,26 @@
 //! # Quick Start
 //!
 //! ```no_run
-//! use wildfly_meta::{update_all, ImageRegistry, FeaturePackRegistry, parse_list, ParseOptions};
+//! use wildfly_meta::{update_all, WildFlyImageRegistry, FeaturePackRegistry, parse_list, ParseOptions};
 //!
 //! // Download or update configuration files from GitHub
 //! let result = update_all().expect("failed to update");
 //! println!("{}", result.summary());
 //!
 //! // Load registries
-//! let images = ImageRegistry::load_default().expect("failed to load images");
+//! let images = WildFlyImageRegistry::load_default().expect("failed to load images");
 //! let packs = FeaturePackRegistry::load_default().expect("failed to load feature packs");
 //!
 //! // Parse a version expression
 //! let items = parse_list("34,dev,ai", &images, &packs, &ParseOptions::all()).unwrap();
 //! for item in &items {
-//!     println!("{}", item.display_name());
+//!     println!("{}", item.short_name());
 //! }
 //! ```
 //!
 //! # Modules
 //!
-//! - **Images** — [`WildFlyImage`], [`ImageRegistry`], and helpers like [`wildfly_dev`] and
+//! - **Images** — [`WildFlyImage`], [`WildFlyImageRegistry`], and helpers like [`wildfly_dev`] and
 //!   [`identifier`].
 //! - **Feature Packs** — [`FeaturePack`] and [`FeaturePackRegistry`] for Galleon feature pack
 //!   metadata.
@@ -40,20 +40,22 @@
 
 mod complete;
 mod feature_pack;
-mod image;
+mod meta_item;
 mod parse;
 mod update;
+mod wildfly_image;
 
 pub use complete::{all_identifiers, suggest, CompletionOptions};
 pub use feature_pack::{FeaturePack, FeaturePackRegistry};
-pub use image::{
-    identifier, identifier_major, identifier_minor, wildfly_dev, ImageRegistry, WildFlyImage,
-    DEVELOPMENT_TAG, DEVELOPMENT_VERSION,
-};
-pub use parse::{parse_feature_pack, parse_image, parse_item, parse_list, MetaItem, ParseOptions};
+pub use meta_item::MetaItem;
+pub use parse::{parse_feature_pack, parse_image, parse_item, parse_list, ParseOptions};
 pub use update::{
     config_dir, feature_packs_path, images_path, update_all, update_all_with_base_url,
     update_feature_packs, update_feature_packs_with_base_url, update_images,
     update_images_with_base_url, UpdateDiff, UpdateResult, UpdateStatus, FEATURE_PACKS_FILENAME,
     IMAGES_FILENAME,
+};
+pub use wildfly_image::{
+    identifier, identifier_major, identifier_minor, wildfly_dev, WildFlyImage,
+    WildFlyImageRegistry, DEVELOPMENT_TAG, DEVELOPMENT_VERSION,
 };

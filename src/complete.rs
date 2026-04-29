@@ -1,8 +1,10 @@
 //! Shell completion support for version and feature pack identifiers.
 
 use crate::feature_pack::FeaturePackRegistry;
-use crate::image::{identifier_major, identifier_minor, ImageRegistry, DEVELOPMENT_VERSION};
 use crate::parse::parse_image;
+use crate::wildfly_image::{
+    identifier_major, identifier_minor, WildFlyImageRegistry, DEVELOPMENT_VERSION,
+};
 
 /// Controls which kinds of completions are offered.
 pub struct CompletionOptions {
@@ -17,7 +19,7 @@ pub struct CompletionOptions {
 /// Includes WildFly version numbers, `"dev"`, and optionally feature pack shortcuts
 /// and versioned identifiers (e.g. `"ai"`, `"ai:0.9.0"`).
 pub fn all_identifiers(
-    images: &ImageRegistry,
+    images: &WildFlyImageRegistry,
     packs: &FeaturePackRegistry,
     options: &CompletionOptions,
 ) -> Vec<String> {
@@ -34,7 +36,7 @@ pub fn all_identifiers(
 /// strings that include the prefix already typed by the user.
 pub fn suggest(
     input: &str,
-    images: &ImageRegistry,
+    images: &WildFlyImageRegistry,
     packs: &FeaturePackRegistry,
     options: &CompletionOptions,
 ) -> Vec<String> {
@@ -48,7 +50,7 @@ pub fn suggest(
 
 fn find_suggestions(
     parameter: Option<&str>,
-    images: &ImageRegistry,
+    images: &WildFlyImageRegistry,
     packs: &FeaturePackRegistry,
     options: &CompletionOptions,
 ) -> (String, String, Vec<String>) {
@@ -94,7 +96,7 @@ fn parse_prefix_token(parameter: Option<&str>) -> (&str, &str) {
     }
 }
 
-fn completion_versions(images: &ImageRegistry) -> Vec<String> {
+fn completion_versions(images: &WildFlyImageRegistry) -> Vec<String> {
     let mut versions: Vec<String> = images
         .all()
         .iter()
@@ -113,7 +115,7 @@ fn simple_version(id: u16) -> String {
     }
 }
 
-fn try_parse_version(input: &str, images: &ImageRegistry) -> Option<(u16, u16)> {
+fn try_parse_version(input: &str, images: &WildFlyImageRegistry) -> Option<(u16, u16)> {
     parse_image(input, images).ok().map(|img| {
         (
             identifier_major(img.identifier),
@@ -122,7 +124,7 @@ fn try_parse_version(input: &str, images: &ImageRegistry) -> Option<(u16, u16)> 
     })
 }
 
-fn versions_after(major: u16, minor: u16, images: &ImageRegistry) -> Vec<String> {
+fn versions_after(major: u16, minor: u16, images: &WildFlyImageRegistry) -> Vec<String> {
     images
         .all()
         .iter()
@@ -143,7 +145,7 @@ fn suggest_after_dots(
     after_dots: &str,
     start_major: u16,
     start_minor: u16,
-    images: &ImageRegistry,
+    images: &WildFlyImageRegistry,
 ) -> Vec<String> {
     if parse_image(after_dots, images).is_ok() {
         return vec![];
@@ -159,7 +161,7 @@ fn suggest_after_dots(
         return vec![];
     };
 
-    let start_id = crate::image::identifier(start_major, start_minor);
+    let start_id = crate::wildfly_image::identifier(start_major, start_minor);
     images
         .all()
         .iter()
@@ -185,8 +187,8 @@ fn suggest_after_dots(
 mod tests {
     use super::*;
 
-    fn image_registry() -> ImageRegistry {
-        ImageRegistry::from_toml(include_str!("../wildfly-images.toml")).unwrap()
+    fn image_registry() -> WildFlyImageRegistry {
+        WildFlyImageRegistry::from_toml(include_str!("../wildfly-images.toml")).unwrap()
     }
 
     fn fp_registry() -> FeaturePackRegistry {

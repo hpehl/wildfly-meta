@@ -42,8 +42,8 @@ impl FeaturePack {
         FP_PORT_OFFSET_BASE + (self.shortcut_index * 100) + self.version_index
     }
 
-    /// Returns a container-safe identifier (e.g. `"ai-0-9-0"`).
-    pub fn container_id(&self) -> String {
+    /// Returns a container-safe name (e.g. `"ai-0-9-0"`).
+    pub fn container_name(&self) -> String {
         format!("{}-{}", self.shortcut, self.version.replace('.', "-"))
     }
 
@@ -56,9 +56,14 @@ impl FeaturePack {
         )
     }
 
-    /// Returns a human-readable label (e.g. `"ai 0.9.0"`).
-    pub fn display_name(&self) -> String {
+    /// Returns a short human-readable name (e.g. `"ai 0.9.0"`).
+    pub fn short_name(&self) -> String {
         format!("{} {}", self.shortcut, self.version)
+    }
+
+    /// Returns a full branded name (e.g. `"AI Feature Pack 0.9.0"`).
+    pub fn full_name(&self) -> String {
+        format!("{} Feature Pack {}", self.name, self.version)
     }
 }
 
@@ -440,11 +445,11 @@ maven_version = "0.9.0"
     }
 
     #[test]
-    fn container_id() {
+    fn container_name() {
         let reg = test_registry();
-        assert_eq!(reg.get("ai", "0.9.0").unwrap().container_id(), "ai-0-9-0");
+        assert_eq!(reg.get("ai", "0.9.0").unwrap().container_name(), "ai-0-9-0");
         assert_eq!(
-            reg.get("graphql", "2.7.0").unwrap().container_id(),
+            reg.get("graphql", "2.7.0").unwrap().container_name(),
             "graphql-2-7-0"
         );
     }
@@ -470,11 +475,11 @@ maven_version = "0.9.0"
     }
 
     #[test]
-    fn display_name() {
+    fn short_name() {
         let reg = test_registry();
-        assert_eq!(reg.get("ai", "0.9.0").unwrap().display_name(), "ai 0.9.0");
+        assert_eq!(reg.get("ai", "0.9.0").unwrap().short_name(), "ai 0.9.0");
         assert_eq!(
-            reg.get("grpc", "0.1.16").unwrap().display_name(),
+            reg.get("grpc", "0.1.16").unwrap().short_name(),
             "grpc 0.1.16"
         );
     }

@@ -16,7 +16,7 @@ wildfly_meta = "0.1"
 ```rust
 use anyhow::Result;
 use wildfly_meta::{
-    update_all, ImageRegistry, FeaturePackRegistry,
+    update_all, WildFlyImageRegistry, FeaturePackRegistry,
     parse_list, ParseOptions, MetaItem,
 };
 
@@ -26,7 +26,7 @@ fn main() -> Result<()> {
     println!("{}", result.summary());
 
     // Load registries
-    let images = ImageRegistry::load_default()?;
+    let images = WildFlyImageRegistry::load_default()?;
     let packs = FeaturePackRegistry::load_default()?;
 
     // Parse a mixed expression
@@ -58,22 +58,22 @@ pub struct WildFlyImage {
 
 Key methods:
 
-| Method | Description |
-|--------|-------------|
-| `image_name()` | Full image reference (e.g. `quay.io/wildfly/wildfly:35.0.1.Final-jdk21`) |
-| `is_dev()` | `true` for the development version |
-| `display_version()` | `"dev"` or the short version string |
-| `http_port()` | Computed HTTP port (8000 + offset) |
-| `management_port()` | Computed management port (9000 + offset) |
+| Method              | Description                                                              |
+|---------------------|--------------------------------------------------------------------------|
+| `image_name()`      | Full image reference (e.g. `quay.io/wildfly/wildfly:35.0.1.Final-jdk21`) |
+| `is_dev()`          | `true` for the development version                                       |
+| `display_version()` | `"dev"` or the short version string (`"10"`, `"26.1"`, `"39"`)           |
+| `http_port()`       | Computed HTTP port (8000 + offset)                                       |
+| `management_port()` | Computed management port (9000 + offset)                                 |
 
-### `ImageRegistry`
+### `WildFlyImageRegistry`
 
 Loads and queries images from `wildfly-images.toml`.
 
 ```rust
-let images = ImageRegistry::load_default()?;        // from ~/.config/wildfly-meta/
-let images = ImageRegistry::load(Path::new("…"))?;  // from custom path
-let images = ImageRegistry::from_toml(content)?;     // from TOML string
+let images = WildFlyImageRegistry::load_default()?;        // from ~/.config/wildfly-meta/
+let images = WildFlyImageRegistry::load(Path::new("…"))?;  // from custom path
+let images = WildFlyImageRegistry::from_toml(content)?;    // from TOML string
 
 let img = images.get(350);                           // lookup by identifier
 let first = images.first();                          // oldest version
@@ -108,12 +108,12 @@ pub struct FeaturePack {
 
 Key methods:
 
-| Method | Description |
-|--------|-------------|
-| `port_offset()` | Computed port offset (10000 + shortcut_index * 100 + version_index) |
-| `container_id()` | Container identifier (e.g. `ai-0-9-0`) |
-| `download_url()` | Maven Central URL for the doc archive |
-| `display_name()` | `"shortcut version"` format |
+| Method           | Description                                                         |
+|------------------|---------------------------------------------------------------------|
+| `port_offset()`  | Computed port offset (10000 + shortcut_index * 100 + version_index) |
+| `container_id()` | Container identifier (e.g. `ai-0-9-0`)                              |
+| `download_url()` | Maven Central URL for the doc archive                               |
+| `display_name()` | `"shortcut version"` format                                         |
 
 ### `FeaturePackRegistry`
 

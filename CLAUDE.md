@@ -22,7 +22,7 @@ cargo fmt --check    # check formatting
 
 Multi-file library crate with no binary targets:
 
-- **`src/image.rs`** — `WildFlyImage` struct, `ImageRegistry` for loading/querying container images from TOML, `wildfly_dev()` helper, and `identifier()` for computing version IDs
+- **`src/image.rs`** — `WildFlyImage` struct, `WildFlyImageRegistry` for loading/querying container images from TOML, `wildfly_dev()` helper, and `identifier()` for computing version IDs
 - **`src/feature_pack.rs`** — `FeaturePack` struct and `FeaturePackRegistry` for loading/querying feature pack metadata from TOML
 - **`src/parse.rs`** — Unified expression parser supporting a mini-DSL: `"3x10,23..26,5x28,34,dev,ai"`. `MetaItem` enum wraps both `WildFlyImage` and `FeaturePack`. `ParseOptions` controls which registries are consulted
 - **`src/update.rs`** — On-demand download of TOML files from GitHub (`main` branch) to `~/.config/wildfly-meta/`. Compares `config_version` to decide whether to re-download. Exports `UpdateStatus` enum

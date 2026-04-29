@@ -64,7 +64,7 @@ pub struct WildFlyImage {
 impl WildFlyImage {
     /// Returns the full container image reference (e.g. `"quay.io/wildfly/wildfly:34.0.1.Final"`),
     /// or the WildFly Git repository URL for the development build.
-    pub fn image_name(&self) -> String {
+    pub fn image_ref(&self) -> String {
         if self.is_dev() {
             "https://github.com/wildfly/wildfly.git".to_string()
         } else {
@@ -77,13 +77,18 @@ impl WildFlyImage {
         self.identifier == 0
     }
 
-    /// Returns a human-readable version string: `"dev"` for development, or `"34.0"` / `"26.1"` for releases.
-    pub fn display_version(&self) -> String {
+    /// Returns a short human-readable name: `"dev"` for development, or `"34.0"` / `"26.1"` for releases.
+    pub fn short_name(&self) -> String {
         if self.is_dev() {
             DEVELOPMENT_VERSION.to_string()
         } else {
             self.short_version.clone()
         }
+    }
+
+    /// Returns a full branded name: `"WildFly dev"` for development, or `"WildFly 34.0"` / `"WildFly 26.1"` for releases.
+    pub fn full_name(&self) -> String {
+        format!("WildFly {}", self.short_name())
     }
 
     /// Returns the HTTP port for this image (base `8000` + identifier as port offset).
@@ -135,11 +140,11 @@ pub(crate) struct WildFlyImageEntry {
 ///
 /// Images are stored in a [`BTreeMap`] keyed by their numeric identifier, so iteration
 /// is always in version order (oldest to newest).
-pub struct ImageRegistry {
+pub struct WildFlyImageRegistry {
     images: BTreeMap<u16, WildFlyImage>,
 }
 
-impl ImageRegistry {
+impl WildFlyImageRegistry {
     /// Loads the image registry from the default configuration path (`~/.config/wildfly-meta/wildfly-images.toml`).
     pub fn load_default() -> Result<Self> {
         Self::load(&images_path())
@@ -240,9 +245,9 @@ pub fn identifier_minor(id: u16) -> u16 {
 mod tests {
     use super::*;
 
-    fn test_registry() -> ImageRegistry {
+    fn test_registry() -> WildFlyImageRegistry {
         let toml = include_str!("../wildfly-images.toml");
-        ImageRegistry::from_toml(toml).expect("failed to parse wildfly-images.toml")
+        WildFlyImageRegistry::from_toml(toml).expect("failed to parse wildfly-images.toml")
     }
 
     // ------------------------------------------------------ loading & config_version
@@ -262,7 +267,7 @@ mod tests {
         let content = include_str!("../wildfly-images.toml");
         fs::write(&path, content).unwrap();
 
-        let reg = ImageRegistry::load(&path).unwrap();
+        let reg = WildFlyImageRegistry::load(&path).unwrap();
         assert_eq!(reg.len(), 33);
 
         let _ = fs::remove_dir_all(&tmp);
@@ -271,7 +276,7 @@ mod tests {
     #[test]
     fn load_from_missing_path() {
         let path = Path::new("/nonexistent/wildfly-images.toml");
-        assert!(ImageRegistry::load(path).is_err());
+        assert!(WildFlyImageRegistry::load(path).is_err());
     }
 
     #[test]
@@ -283,7 +288,7 @@ mod tests {
         let content = include_str!("../wildfly-images.toml");
         fs::write(&path, content).unwrap();
 
-        let version = ImageRegistry::config_version(&path).unwrap();
+        let version = WildFlyImageRegistry::config_version(&path).unwrap();
         assert!(version >= 1);
 
         let _ = fs::remove_dir_all(&tmp);
@@ -292,7 +297,7 @@ mod tests {
     #[test]
     fn config_version_missing_file() {
         let path = Path::new("/nonexistent/wildfly-images.toml");
-        assert!(ImageRegistry::config_version(path).is_err());
+        assert!(WildFlyImageRegistry::config_version(path).is_err());
     }
 
     // ------------------------------------------------------ registry queries
@@ -333,7 +338,7 @@ mod tests {
 config_version = 1
 images = []
 "#;
-        let reg = ImageRegistry::from_toml(toml).unwrap();
+        let reg = WildFlyImageRegistry::from_toml(toml).unwrap();
         assert!(reg.first().is_none());
         assert!(reg.last().is_none());
     }
@@ -379,7 +384,7 @@ images = []
 config_version = 1
 images = []
 "#;
-        let reg = ImageRegistry::from_toml(toml).unwrap();
+        let reg = WildFlyImageRegistry::from_toml(toml).unwrap();
         assert!(reg.is_empty());
         assert_eq!(reg.len(), 0);
     }
@@ -420,38 +425,53 @@ images = []
     // ------------------------------------------------------ wildfly image methods
 
     #[test]
-    fn display_version_regular() {
+    fn short_name_regular() {
         let reg = test_registry();
         let img = reg.get(250).unwrap();
-        assert_eq!(img.display_version(), "25.0");
+        assert_eq!(img.short_name(), "25.0");
         let img = reg.get(261).unwrap();
-        assert_eq!(img.display_version(), "26.1");
+        assert_eq!(img.short_name(), "26.1");
     }
 
     #[test]
-    fn display_version_dev() {
+    fn short_name_dev() {
         let dev = wildfly_dev();
-        assert_eq!(dev.display_version(), "dev");
+        assert_eq!(dev.short_name(), "dev");
     }
 
     #[test]
-    fn image_name_regular() {
+    fn full_name_regular() {
+        let reg = test_registry();
+        let img = reg.get(250).unwrap();
+        assert_eq!(img.full_name(), "WildFly 25.0");
+        let img = reg.get(261).unwrap();
+        assert_eq!(img.full_name(), "WildFly 26.1");
+    }
+
+    #[test]
+    fn full_name_dev() {
+        let dev = wildfly_dev();
+        assert_eq!(dev.full_name(), "WildFly dev");
+    }
+
+    #[test]
+    fn image_ref_regular() {
         let reg = test_registry();
         let img = reg.get(390).unwrap();
-        assert!(img.image_name().starts_with("quay.io/wildfly/wildfly:"));
+        assert!(img.image_ref().starts_with("quay.io/wildfly/wildfly:"));
     }
 
     #[test]
-    fn image_name_dev() {
+    fn image_ref_dev() {
         let dev = wildfly_dev();
-        assert_eq!(dev.image_name(), "https://github.com/wildfly/wildfly.git");
+        assert_eq!(dev.image_ref(), "https://github.com/wildfly/wildfly.git");
     }
 
     #[test]
-    fn image_name_includes_suffix() {
+    fn image_ref_includes_suffix() {
         let reg = test_registry();
         let img = reg.get(261).unwrap();
-        let name = img.image_name();
+        let name = img.image_ref();
         assert!(name.contains("Final-jdk17"));
     }
 
