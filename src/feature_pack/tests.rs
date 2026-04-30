@@ -218,8 +218,7 @@ fn shortcut_index_computed() {
     assert_eq!(reg.get("ai", "0.9.0").unwrap().shortcut_index, 0);
     assert_eq!(reg.get("graphql", "2.7.0").unwrap().shortcut_index, 1);
     assert_eq!(reg.get("grpc", "0.1.16").unwrap().shortcut_index, 2);
-    assert_eq!(reg.get("keycloak", "26.6.1").unwrap().shortcut_index, 3);
-    assert_eq!(reg.get("myfaces", "2.0.3").unwrap().shortcut_index, 4);
+    assert_eq!(reg.get("myfaces", "2.0.3").unwrap().shortcut_index, 3);
 }
 
 #[test]
@@ -264,8 +263,7 @@ fn port_offset() {
     assert_eq!(reg.get("ai", "0.9.1").unwrap().port_offset(), 10_000);
     assert_eq!(reg.get("graphql", "2.7.0").unwrap().port_offset(), 10_100);
     assert_eq!(reg.get("grpc", "0.1.16").unwrap().port_offset(), 10_200);
-    assert_eq!(reg.get("keycloak", "26.6.1").unwrap().port_offset(), 10_300);
-    assert_eq!(reg.get("myfaces", "2.0.3").unwrap().port_offset(), 10_400);
+    assert_eq!(reg.get("myfaces", "2.0.3").unwrap().port_offset(), 10_300);
 }
 
 #[test]

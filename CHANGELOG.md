@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix test assertions referencing removed Keycloak feature pack
+
 ## [0.6.0] - 2026-04-30
 
 ### Added

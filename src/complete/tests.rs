@@ -60,7 +60,7 @@ fn all_feature_packs_excludes_versions() {
 fn all_feature_packs_includes_all_shortcuts() {
     let feature_packs = feature_pack_registry();
     let ids = all_feature_packs(&feature_packs);
-    for shortcut in &["ai", "graphql", "grpc", "keycloak", "myfaces"] {
+    for shortcut in &["ai", "graphql", "grpc", "myfaces"] {
         assert!(ids.contains(&shortcut.to_string()), "Missing: {}", shortcut);
     }
 }
