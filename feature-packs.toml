@@ -1,4 +1,4 @@
-config_version = 2
+config_version = 3
 
 [[feature_packs]]
 shortcut = "ai"
@@ -19,7 +19,6 @@ artifact_id = "wildfly-microprofile-graphql-feature-pack"
 versions = [
   { version = "2.7.0", maven_version = "2.7.0.Final" },
   { version = "2.6.0", maven_version = "2.6.0.Final" },
-  { version = "2.5.0", maven_version = "2.5.0.Final" },
 ]
 
 [[feature_packs]]
@@ -34,17 +33,6 @@ versions = [
 ]
 
 [[feature_packs]]
-shortcut = "keycloak"
-name = "Keycloak"
-group_id = "org.keycloak"
-artifact_id = "keycloak-saml-adapter-galleon-pack"
-versions = [
-  { version = "26.6.1", maven_version = "26.6.1" },
-  { version = "26.6.0", maven_version = "26.6.0" },
-  { version = "26.5.7", maven_version = "26.5.7" },
-]
-
-[[feature_packs]]
 shortcut = "myfaces"
 name = "MyFaces"
 group_id = "org.wildfly"
@@ -52,16 +40,4 @@ artifact_id = "wildfly-myfaces-feature-pack"
 versions = [
   { version = "2.0.3", maven_version = "2.0.3.Final" },
   { version = "2.0.2", maven_version = "2.0.2.Final" },
-  { version = "2.0.0", maven_version = "2.0.0.Final" },
-]
-
-[[feature_packs]]
-shortcut = "vertx"
-name = "Vertx"
-group_id = "org.wildfly.extras.vertx"
-artifact_id = "wildfly-vertx-feature-pack"
-versions = [
-  { version = "1.0.2", maven_version = "1.0.2.Final" },
-  { version = "1.0.1", maven_version = "1.0.1.Final" },
-  { version = "1.0.0", maven_version = "1.0.0.Final" },
 ]
