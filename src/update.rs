@@ -148,29 +148,13 @@ pub fn update_wildfly_images_with_base_url(base_url: &str) -> Result<UpdateStatu
             Ok((config.config_version, config.wildfly_images.len()))
         },
         |old_content, new_content| {
-            let old_registry = WildFlyImageRegistry::from_toml(old_content);
-            let new_registry = WildFlyImageRegistry::from_toml(new_content);
-            match (old_registry, new_registry) {
-                (Ok(old_reg), Ok(new_reg)) => {
-                    let old_keys: BTreeSet<u16> = old_reg.keys().copied().collect();
-                    let new_keys: BTreeSet<u16> = new_reg.keys().copied().collect();
-                    let added = new_keys
-                        .difference(&old_keys)
-                        .filter_map(|k| new_reg.get(*k))
-                        .map(|wildfly_image| wildfly_image.full_name())
-                        .collect();
-                    let removed = old_keys
-                        .difference(&new_keys)
-                        .filter_map(|k| old_reg.get(*k))
-                        .map(|wildfly_image| wildfly_image.full_name())
-                        .collect();
-                    UpdateDiff { added, removed }
-                }
-                _ => UpdateDiff {
-                    added: vec![],
-                    removed: vec![],
-                },
-            }
+            compute_registry_diff(
+                old_content,
+                new_content,
+                WildFlyImageRegistry::from_toml,
+                |reg| reg.keys().copied().collect(),
+                |reg, k| reg.get(*k).map(|wi| wi.full_name()),
+            )
         },
     )
 }
@@ -192,31 +176,43 @@ pub fn update_feature_packs_with_base_url(base_url: &str) -> Result<UpdateStatus
             Ok((config.config_version, config.feature_packs.len()))
         },
         |old_content, new_content| {
-            let old_registry = FeaturePackRegistry::from_toml(old_content);
-            let new_registry = FeaturePackRegistry::from_toml(new_content);
-            match (old_registry, new_registry) {
-                (Ok(old_reg), Ok(new_reg)) => {
-                    let old_keys: BTreeSet<&(String, semver::Version)> = old_reg.keys().collect();
-                    let new_keys: BTreeSet<&(String, semver::Version)> = new_reg.keys().collect();
-                    let added = new_keys
-                        .difference(&old_keys)
-                        .filter_map(|(s, v)| new_reg.get(s, &v.to_string()))
-                        .map(|feature_pack| feature_pack.short_name())
-                        .collect();
-                    let removed = old_keys
-                        .difference(&new_keys)
-                        .filter_map(|(s, v)| old_reg.get(s, &v.to_string()))
-                        .map(|feature_pack| feature_pack.short_name())
-                        .collect();
-                    UpdateDiff { added, removed }
-                }
-                _ => UpdateDiff {
-                    added: vec![],
-                    removed: vec![],
-                },
-            }
+            compute_registry_diff(
+                old_content,
+                new_content,
+                FeaturePackRegistry::from_toml,
+                |reg| reg.keys().cloned().collect(),
+                |reg, (s, v)| reg.get(s, &v.to_string()).map(|fp| fp.short_name()),
+            )
         },
     )
+}
+
+fn compute_registry_diff<R, K: Ord>(
+    old_content: &str,
+    new_content: &str,
+    parse: impl Fn(&str) -> Result<R>,
+    keys: impl Fn(&R) -> BTreeSet<K>,
+    lookup: impl Fn(&R, &K) -> Option<String>,
+) -> UpdateDiff {
+    match (parse(old_content), parse(new_content)) {
+        (Ok(old_reg), Ok(new_reg)) => {
+            let old_keys = keys(&old_reg);
+            let new_keys = keys(&new_reg);
+            let added = new_keys
+                .difference(&old_keys)
+                .filter_map(|k| lookup(&new_reg, k))
+                .collect();
+            let removed = old_keys
+                .difference(&new_keys)
+                .filter_map(|k| lookup(&old_reg, k))
+                .collect();
+            UpdateDiff { added, removed }
+        }
+        _ => UpdateDiff {
+            added: vec![],
+            removed: vec![],
+        },
+    }
 }
 
 fn update_file<F, D>(

@@ -2,13 +2,13 @@
 
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::Path;
 
 use anyhow::Result;
 use semver::Version;
 use serde::Deserialize;
 
+use crate::registry;
 use crate::update::{update_wildfly_images, wildfly_images_path};
 
 /// The version string used to refer to the WildFly development build (e.g. `"dev"`).
@@ -164,14 +164,12 @@ impl WildFlyImageRegistry {
     ///
     /// The `resolution_hint` is appended to error messages if the retry also fails.
     pub fn load_or_update(resolution_hint: &str) -> Result<Self> {
-        let path = wildfly_images_path();
-        if !path.exists() {
-            update_wildfly_images()?;
-        }
-        Self::load_default(resolution_hint).or_else(|_| {
-            update_wildfly_images()?;
-            Self::load_default(resolution_hint)
-        })
+        registry::load_or_update(
+            wildfly_images_path(),
+            resolution_hint,
+            update_wildfly_images,
+            Self::load_default,
+        )
     }
 
     /// Loads the image registry from the given TOML file path.
@@ -179,20 +177,7 @@ impl WildFlyImageRegistry {
     /// The `resolution_hint` is appended to error messages when the file is missing or
     /// unparsable, letting each consumer suggest their own recovery action.
     pub fn load(path: &Path, resolution_hint: &str) -> Result<Self> {
-        let content = fs::read_to_string(path).map_err(|e| {
-            if resolution_hint.is_empty() {
-                anyhow::anyhow!("{e}")
-            } else {
-                anyhow::anyhow!("{e}. {resolution_hint}")
-            }
-        })?;
-        Self::from_toml(&content).map_err(|e| {
-            if resolution_hint.is_empty() {
-                anyhow::anyhow!("Failed to parse {}: {e}", path.display())
-            } else {
-                anyhow::anyhow!("Failed to parse {}: {e}. {resolution_hint}", path.display())
-            }
-        })
+        registry::load_toml(path, resolution_hint, Self::from_toml)
     }
 
     /// Parses the image registry from a TOML string.
@@ -260,9 +245,7 @@ impl WildFlyImageRegistry {
 
     /// Reads and returns the `config_version` from the given TOML file without loading the full registry.
     pub fn config_version(path: &Path) -> Result<u32> {
-        let content = fs::read_to_string(path)?;
-        let config: WildFlyImagesConfig = toml::from_str(&content)?;
-        Ok(config.config_version)
+        registry::config_version::<WildFlyImagesConfig>(path, |c| c.config_version)
     }
 }
 
@@ -285,6 +268,9 @@ pub fn identifier_minor(id: u16) -> u16 {
 
 #[cfg(test)]
 mod tests {
+    use std::cmp::Ordering;
+    use std::fs;
+
     use super::*;
 
     fn test_registry() -> WildFlyImageRegistry {

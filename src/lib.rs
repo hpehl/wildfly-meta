@@ -10,7 +10,7 @@
 //! # Quick Start
 //!
 //! ```no_run
-//! use wildfly_meta::{update_all, WildFlyImageRegistry, FeaturePackRegistry, parse_meta_items, ParseOptions};
+//! use wildfly_meta::{update_all, WildFlyImageRegistry, FeaturePackRegistry, parse_meta_items, DslOptions};
 //!
 //! // Download or update configuration files from GitHub
 //! let result = update_all().expect("failed to update");
@@ -21,7 +21,7 @@
 //! let feature_packs = FeaturePackRegistry::load_default("").expect("failed to load feature packs");
 //!
 //! // Parse a version expression
-//! let items = parse_meta_items("34,dev,ai", &wildfly_images, &feature_packs, &ParseOptions::all(), &ParseOptions::all()).unwrap();
+//! let items = parse_meta_items("34,dev,ai", &wildfly_images, &feature_packs, &DslOptions::all(), &DslOptions::all()).unwrap();
 //! for item in &items {
 //!     println!("{}", item.short_name());
 //! }
@@ -44,19 +44,22 @@
 mod complete;
 mod feature_pack;
 mod meta_item;
+mod options;
 mod parse;
+mod registry;
 mod update;
 mod wildfly_image;
 
 pub use complete::{
     all_feature_packs, all_meta_items, all_wildfly_images, suggest_feature_packs,
-    suggest_meta_items, suggest_wildfly_images, CompletionOptions,
+    suggest_meta_items, suggest_wildfly_images,
 };
 pub use feature_pack::{FeaturePack, FeaturePackRegistry};
 pub use meta_item::MetaItem;
+pub use options::DslOptions;
 pub use parse::{
     parse_feature_pack, parse_feature_packs, parse_meta_item, parse_meta_items,
-    parse_wildfly_image, parse_wildfly_images, ParseOptions,
+    parse_wildfly_image, parse_wildfly_images,
 };
 pub use update::{
     config_dir, feature_packs_path, update_all, update_all_with_base_url, update_feature_packs,

@@ -1,13 +1,13 @@
 //! Galleon feature pack metadata and registry.
 
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::Path;
 
 use anyhow::Result;
 use semver::Version;
 use serde::Deserialize;
 
+use crate::registry;
 use crate::update::{feature_packs_path, update_feature_packs};
 
 const FEATURE_PACK_PORT_OFFSET_BASE: u16 = 10_000;
@@ -19,7 +19,7 @@ const FEATURE_PACK_PORT_OFFSET_STEP: u16 = 100;
 /// Feature packs extend WildFly with additional capabilities (e.g. AI, GraphQL, gRPC).
 /// Each feature pack has a short alias (`shortcut`) used in the version expression DSL
 /// and Maven coordinates for downloading the documentation archive.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct FeaturePack {
     /// Short alias used in the DSL (e.g. `"ai"`, `"graphql"`).
     pub shortcut: String,
@@ -125,14 +125,12 @@ impl FeaturePackRegistry {
     ///
     /// The `resolution_hint` is appended to error messages if the retry also fails.
     pub fn load_or_update(resolution_hint: &str) -> Result<Self> {
-        let path = feature_packs_path();
-        if !path.exists() {
-            update_feature_packs()?;
-        }
-        Self::load_default(resolution_hint).or_else(|_| {
-            update_feature_packs()?;
-            Self::load_default(resolution_hint)
-        })
+        registry::load_or_update(
+            feature_packs_path(),
+            resolution_hint,
+            update_feature_packs,
+            Self::load_default,
+        )
     }
 
     /// Loads the feature pack registry from the given TOML file path.
@@ -140,20 +138,7 @@ impl FeaturePackRegistry {
     /// The `resolution_hint` is appended to error messages when the file is missing or
     /// unparsable, letting each consumer suggest their own recovery action.
     pub fn load(path: &Path, resolution_hint: &str) -> Result<Self> {
-        let content = fs::read_to_string(path).map_err(|e| {
-            if resolution_hint.is_empty() {
-                anyhow::anyhow!("{e}")
-            } else {
-                anyhow::anyhow!("{e}. {resolution_hint}")
-            }
-        })?;
-        Self::from_toml(&content).map_err(|e| {
-            if resolution_hint.is_empty() {
-                anyhow::anyhow!("Failed to parse {}: {e}", path.display())
-            } else {
-                anyhow::anyhow!("Failed to parse {}: {e}. {resolution_hint}", path.display())
-            }
-        })
+        registry::load_toml(path, resolution_hint, Self::from_toml)
     }
 
     /// Parses the feature pack registry from a TOML string.
@@ -162,18 +147,12 @@ impl FeaturePackRegistry {
         let mut feature_packs = BTreeMap::new();
         let mut shortcut_indices: BTreeMap<String, u16> = BTreeMap::new();
         let mut version_counts: BTreeMap<String, u16> = BTreeMap::new();
-        let mut next_shortcut_index: u16 = 0;
 
         for entry in config.feature_packs {
-            let shortcut_index = match shortcut_indices.get(&entry.shortcut) {
-                Some(&idx) => idx,
-                None => {
-                    let idx = next_shortcut_index;
-                    shortcut_indices.insert(entry.shortcut.clone(), idx);
-                    next_shortcut_index += 1;
-                    idx
-                }
-            };
+            let next_index = shortcut_indices.len() as u16;
+            let shortcut_index = *shortcut_indices
+                .entry(entry.shortcut.clone())
+                .or_insert(next_index);
 
             for ve in entry.versions {
                 let version_index = version_counts.entry(entry.shortcut.clone()).or_insert(0);
@@ -263,9 +242,7 @@ impl FeaturePackRegistry {
 
     /// Reads and returns the `config_version` from the given TOML file without loading the full registry.
     pub fn config_version(path: &Path) -> Result<u32> {
-        let content = fs::read_to_string(path)?;
-        let config: FeaturePacksConfig = toml::from_str(&content)?;
-        Ok(config.config_version)
+        registry::config_version::<FeaturePacksConfig>(path, |c| c.config_version)
     }
 }
 
@@ -273,6 +250,8 @@ impl FeaturePackRegistry {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use super::*;
 
     fn test_registry() -> FeaturePackRegistry {
