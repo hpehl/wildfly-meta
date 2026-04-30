@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- Renamed `ParseOptions` and `CompletionOptions` to unified `DslOptions` struct
+
+### Changed
+
+- Extracted shared registry loading and `config_version` logic into internal `registry` module
+- Extracted `compute_registry_diff` generic helper to eliminate duplicated diff logic in `update.rs`
+- Simplified `FeaturePackRegistry::from_toml` index tracking using `entry` API
+- Moved tests from `parse.rs` and `complete.rs` into dedicated `parse/tests.rs` and `complete/tests.rs` submodules
+- Added `Hash` derive to `FeaturePack` for consistency with `WildFlyImage`
+
 ## [0.4.1] - 2026-04-30
 
 ### Added
