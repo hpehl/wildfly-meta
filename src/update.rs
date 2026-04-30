@@ -196,16 +196,16 @@ pub fn update_feature_packs_with_base_url(base_url: &str) -> Result<UpdateStatus
             let new_registry = FeaturePackRegistry::from_toml(new_content);
             match (old_registry, new_registry) {
                 (Ok(old_reg), Ok(new_reg)) => {
-                    let old_keys: BTreeSet<&(String, String)> = old_reg.keys().collect();
-                    let new_keys: BTreeSet<&(String, String)> = new_reg.keys().collect();
+                    let old_keys: BTreeSet<&(String, semver::Version)> = old_reg.keys().collect();
+                    let new_keys: BTreeSet<&(String, semver::Version)> = new_reg.keys().collect();
                     let added = new_keys
                         .difference(&old_keys)
-                        .filter_map(|(s, v)| new_reg.get(s, v))
+                        .filter_map(|(s, v)| new_reg.get(s, &v.to_string()))
                         .map(|feature_pack| feature_pack.short_name())
                         .collect();
                     let removed = old_keys
                         .difference(&new_keys)
-                        .filter_map(|(s, v)| old_reg.get(s, v))
+                        .filter_map(|(s, v)| old_reg.get(s, &v.to_string()))
                         .map(|feature_pack| feature_pack.short_name())
                         .collect();
                     UpdateDiff { added, removed }
@@ -263,6 +263,8 @@ where
         })
     }
 }
+
+// ------------------------------------------------------ tests
 
 #[cfg(test)]
 mod tests {
@@ -436,6 +438,7 @@ repository = "quay.io/wildfly/wildfly"
         assert_eq!(removed, vec!["WildFly 30.0"]);
     }
 
+    //noinspection DuplicatedCode
     #[test]
     fn feature_packs_diff_computation() {
         let old_toml = r#"
@@ -476,17 +479,17 @@ versions = [
 
         let old_reg = FeaturePackRegistry::from_toml(old_toml).unwrap();
         let new_reg = FeaturePackRegistry::from_toml(new_toml).unwrap();
-        let old_keys: BTreeSet<&(String, String)> = old_reg.keys().collect();
-        let new_keys: BTreeSet<&(String, String)> = new_reg.keys().collect();
+        let old_keys: BTreeSet<&(String, semver::Version)> = old_reg.keys().collect();
+        let new_keys: BTreeSet<&(String, semver::Version)> = new_reg.keys().collect();
 
         let added: Vec<String> = new_keys
             .difference(&old_keys)
-            .filter_map(|(s, v)| new_reg.get(s, v))
+            .filter_map(|(s, v)| new_reg.get(s, &v.to_string()))
             .map(|feature_pack| feature_pack.short_name())
             .collect();
         let removed: Vec<String> = old_keys
             .difference(&new_keys)
-            .filter_map(|(s, v)| old_reg.get(s, v))
+            .filter_map(|(s, v)| old_reg.get(s, &v.to_string()))
             .map(|feature_pack| feature_pack.short_name())
             .collect();
 

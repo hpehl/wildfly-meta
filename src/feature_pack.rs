@@ -5,6 +5,7 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::Result;
+use semver::Version;
 use serde::Deserialize;
 
 use crate::update::feature_packs_path;
@@ -32,8 +33,8 @@ pub struct FeaturePack {
     pub shortcut_index: u16,
     /// Zero-based index of this version within its shortcut group.
     pub version_index: u16,
-    /// Display version string (e.g. `"0.9.0"`).
-    pub version: String,
+    /// Semantic version (e.g. `0.9.0`).
+    pub version: Version,
     /// Maven version string, which may differ from the display version (e.g. `"2.7.0.Final"`).
     pub maven_version: String,
 }
@@ -48,7 +49,11 @@ impl FeaturePack {
 
     /// Returns a container-safe name (e.g. `"ai-0-9-0"`).
     pub fn container_name(&self) -> String {
-        format!("{}-{}", self.shortcut, self.version.replace('.', "-"))
+        format!(
+            "{}-{}",
+            self.shortcut,
+            self.version.to_string().replace('.', "-")
+        )
     }
 
     /// Returns the Maven Central URL for the feature pack's documentation ZIP archive.
@@ -97,7 +102,7 @@ pub(crate) struct VersionEntry {
 /// Feature packs are stored in a [`BTreeMap`] keyed by `(shortcut, version)`, so iteration
 /// is alphabetical by shortcut and then by version within each shortcut group.
 pub struct FeaturePackRegistry {
-    feature_packs: BTreeMap<(String, String), FeaturePack>,
+    feature_packs: BTreeMap<(String, Version), FeaturePack>,
 }
 
 impl FeaturePackRegistry {
@@ -136,6 +141,7 @@ impl FeaturePackRegistry {
                 let vi = *version_index;
                 *version_index += 1;
 
+                let version: Version = Version::parse(&ve.version)?;
                 let feature_pack = FeaturePack {
                     shortcut: entry.shortcut.clone(),
                     name: entry.name.clone(),
@@ -143,24 +149,24 @@ impl FeaturePackRegistry {
                     artifact_id: entry.artifact_id.clone(),
                     shortcut_index,
                     version_index: vi,
-                    version: ve.version.clone(),
+                    version: version.clone(),
                     maven_version: ve.maven_version,
                 };
-                feature_packs.insert((entry.shortcut.clone(), ve.version), feature_pack);
+                feature_packs.insert((entry.shortcut.clone(), version), feature_pack);
             }
         }
         Ok(Self { feature_packs })
     }
 
     /// Returns an iterator over `(shortcut, version)` keys in sorted order.
-    pub fn keys(&self) -> impl Iterator<Item = &(String, String)> {
+    pub fn keys(&self) -> impl Iterator<Item = &(String, Version)> {
         self.feature_packs.keys()
     }
 
-    /// Returns the feature pack matching the given shortcut and version, or `None`.
+    /// Returns the feature pack matching the given shortcut and version string, or `None`.
     pub fn get(&self, shortcut: &str, version: &str) -> Option<&FeaturePack> {
-        self.feature_packs
-            .get(&(shortcut.to_string(), version.to_string()))
+        let version = Version::parse(version).ok()?;
+        self.feature_packs.get(&(shortcut.to_string(), version))
     }
 
     /// Returns the latest (last registered) version of the given shortcut, or `None`.
@@ -180,11 +186,11 @@ impl FeaturePackRegistry {
     }
 
     /// Returns all known version strings for the given shortcut.
-    pub fn known_versions(&self, shortcut: &str) -> Vec<&str> {
+    pub fn known_versions(&self, shortcut: &str) -> Vec<String> {
         self.feature_packs
             .keys()
             .filter(|(s, _)| s == shortcut)
-            .map(|(_, v)| v.as_str())
+            .map(|(_, v)| v.to_string())
             .collect()
     }
 
@@ -201,7 +207,7 @@ impl FeaturePackRegistry {
             .map(|s| s.to_string())
             .collect();
         for (shortcut, version) in self.feature_packs.keys() {
-            ids.push(format!("{}:{}", shortcut, version));
+            ids.push(format!("{shortcut}:{version}"));
         }
         ids
     }
@@ -291,7 +297,7 @@ mod tests {
     fn get_by_shortcut_version() {
         let reg = test_registry();
         let latest = reg.latest("ai").unwrap();
-        let feature_pack = reg.get("ai", &latest.version).unwrap();
+        let feature_pack = reg.get("ai", &latest.version.to_string()).unwrap();
         assert_eq!(feature_pack.shortcut, "ai");
         assert_eq!(feature_pack.version, latest.version);
     }
@@ -308,7 +314,7 @@ mod tests {
         let shortcuts = reg.known_shortcuts();
         for shortcut in &shortcuts {
             let feature_pack = reg.latest(shortcut).unwrap();
-            assert!(!feature_pack.version.is_empty());
+            assert!(!feature_pack.version.to_string().is_empty());
             assert_eq!(feature_pack.shortcut, *shortcut);
         }
     }
@@ -433,7 +439,7 @@ versions = [
         assert_eq!(reg.get("ai", "0.8.0").unwrap().shortcut_index, 0);
         assert_eq!(reg.get("ai", "0.9.0").unwrap().shortcut_index, 0);
         let latest = reg.latest("ai").unwrap();
-        assert_eq!(latest.version, "0.9.0");
+        assert_eq!(latest.version.to_string(), "0.9.0");
         assert_eq!(reg.known_versions("ai"), vec!["0.8.0", "0.9.0"]);
     }
 

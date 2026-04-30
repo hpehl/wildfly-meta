@@ -516,7 +516,7 @@ mod tests {
         let reg = feature_pack_registry();
         let feature_pack = parse_feature_pack("ai", &reg).unwrap();
         assert_eq!(feature_pack.shortcut, "ai");
-        assert_eq!(feature_pack.version, "0.9.1");
+        assert_eq!(feature_pack.version.to_string(), "0.9.1");
     }
 
     #[test]
@@ -1248,7 +1248,7 @@ mod tests {
         let feature_packs = feature_pack_registry();
         let items = parse_feature_packs("ai:0.9.0", &feature_packs, &ParseOptions::none()).unwrap();
         assert_eq!(items.len(), 1);
-        assert_eq!(items[0].version, "0.9.0");
+        assert_eq!(items[0].version.to_string(), "0.9.0");
     }
 
     #[test]

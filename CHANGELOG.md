@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- Changed `FeaturePack.version` from `String` to `semver::Version` for type-safe semantic versioning
+- Changed `FeaturePackRegistry` BTreeMap key from `(String, String)` to `(String, semver::Version)`, giving proper version ordering
+- `FeaturePackRegistry::keys()` now returns `impl Iterator<Item = &(String, semver::Version)>`
+- `FeaturePackRegistry::known_versions()` now returns `Vec<String>` instead of `Vec<&str>`
+
 ## [0.2.0] - 2026-04-30
 
 ### Breaking Changes

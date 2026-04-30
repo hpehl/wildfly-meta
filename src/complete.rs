@@ -38,29 +38,14 @@ impl Default for CompletionOptions {
     }
 }
 
+// ------------------------------------------------------ wildfly images
+
 /// Returns all WildFly version identifiers for shell completion.
 ///
 /// Includes two-digit major versions (e.g. `"34"`), `major.minor` versions (e.g. `"26.1"`),
 /// and `"dev"`.
 pub fn all_wildfly_images(wildfly_images: &WildFlyImageRegistry) -> Vec<String> {
     completion_versions(wildfly_images)
-}
-
-/// Returns all feature pack identifiers for shell completion.
-///
-/// Includes bare shortcuts (e.g. `"ai"`) and versioned forms (e.g. `"ai:0.9.0"`).
-pub fn all_feature_packs(feature_packs: &FeaturePackRegistry) -> Vec<String> {
-    feature_packs.all_identifiers()
-}
-
-/// Returns all identifiers (WildFly versions and feature packs) for shell completion.
-pub fn all_meta_items(
-    wildfly_images: &WildFlyImageRegistry,
-    feature_packs: &FeaturePackRegistry,
-) -> Vec<String> {
-    let mut ids = completion_versions(wildfly_images);
-    ids.extend(feature_packs.all_identifiers());
-    ids
 }
 
 /// Returns completion suggestions for WildFly versions based on a partial input string.
@@ -73,6 +58,15 @@ pub fn suggest_wildfly_images(
 ) -> Vec<String> {
     let candidates = completion_versions(wildfly_images);
     build_suggestions(input, candidates, Some(wildfly_images), options)
+}
+
+// ------------------------------------------------------ feature packs
+
+/// Returns all feature pack identifiers for shell completion.
+///
+/// Includes bare shortcuts (e.g. `"ai"`) and versioned forms (e.g. `"ai:0.9.0"`).
+pub fn all_feature_packs(feature_packs: &FeaturePackRegistry) -> Vec<String> {
+    feature_packs.all_identifiers()
 }
 
 /// Returns completion suggestions for feature packs based on a partial input string.
@@ -90,6 +84,18 @@ pub fn suggest_feature_packs(
         multipliers: options.multipliers,
     };
     build_suggestions(input, candidates, None, &feature_pack_options)
+}
+
+// ------------------------------------------------------ meta items
+
+/// Returns all identifiers (WildFly versions and feature packs) for shell completion.
+pub fn all_meta_items(
+    wildfly_images: &WildFlyImageRegistry,
+    feature_packs: &FeaturePackRegistry,
+) -> Vec<String> {
+    let mut ids = completion_versions(wildfly_images);
+    ids.extend(feature_packs.all_identifiers());
+    ids
 }
 
 /// Returns completion suggestions for both WildFly versions and feature packs based on a
@@ -113,6 +119,8 @@ pub fn suggest_meta_items(
     };
     build_suggestions(input, candidates, Some(wildfly_images), &effective)
 }
+
+// ------------------------------------------------------ helper functions
 
 fn build_suggestions(
     input: &str,
@@ -319,6 +327,8 @@ fn suggest_after_dots(
         })
         .collect()
 }
+
+// ------------------------------------------------------ tests
 
 #[cfg(test)]
 mod tests {
