@@ -9,7 +9,9 @@ use serde::Deserialize;
 
 use crate::update::feature_packs_path;
 
-const FP_PORT_OFFSET_BASE: u16 = 10_000;
+const FEATURE_PACK_PORT_OFFSET_BASE: u16 = 10_000;
+// Max versions per shortcut before colliding with the next shortcut's port range
+const FEATURE_PACK_PORT_OFFSET_STEP: u16 = 100;
 
 /// A WildFly Galleon feature pack with Maven coordinates and version metadata.
 ///
@@ -39,7 +41,9 @@ pub struct FeaturePack {
 impl FeaturePack {
     /// Returns a unique port offset for this feature pack, starting at `10_000`.
     pub fn port_offset(&self) -> u16 {
-        FP_PORT_OFFSET_BASE + (self.shortcut_index * 100) + self.version_index
+        FEATURE_PACK_PORT_OFFSET_BASE
+            + (self.shortcut_index * FEATURE_PACK_PORT_OFFSET_STEP)
+            + self.version_index
     }
 
     /// Returns a container-safe name (e.g. `"ai-0-9-0"`).
@@ -219,6 +223,8 @@ impl FeaturePackRegistry {
         Ok(config.config_version)
     }
 }
+
+// ------------------------------------------------------ tests
 
 #[cfg(test)]
 mod tests {
