@@ -16,7 +16,7 @@ use crate::wildfly_image::{WildFlyImageRegistry, WildFlyImagesConfig};
 const DEFAULT_BASE_URL: &str = "https://raw.githubusercontent.com/hpehl/wildfly-meta/main";
 
 /// Filename for the WildFly images TOML configuration.
-pub const IMAGES_FILENAME: &str = "wildfly-images.toml";
+pub const WILDFLY_IMAGES_FILENAME: &str = "wildfly-images.toml";
 
 /// Filename for the feature packs TOML configuration.
 pub const FEATURE_PACKS_FILENAME: &str = "feature-packs.toml";
@@ -81,11 +81,11 @@ impl UpdateStatus {
     }
 }
 
-/// Combined result of updating both images and feature packs configuration.
+/// Combined result of updating both WildFly images and feature packs configuration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UpdateResult {
     /// Status of the WildFly images update.
-    pub images: UpdateStatus,
+    pub wildfly_images: UpdateStatus,
     /// Status of the feature packs update.
     pub feature_packs: UpdateStatus,
 }
@@ -93,9 +93,9 @@ pub struct UpdateResult {
 impl UpdateResult {
     /// Returns a human-readable summary of both update statuses.
     pub fn summary(&self) -> String {
-        let images = self.images.summary("WildFly images");
-        let packs = self.feature_packs.summary("Feature packs");
-        format!("{images}\n{packs}")
+        let wildfly_images = self.wildfly_images.summary("WildFly images");
+        let feature_packs = self.feature_packs.summary("Feature packs");
+        format!("{wildfly_images}\n{feature_packs}")
     }
 }
 
@@ -107,8 +107,8 @@ pub fn config_dir() -> PathBuf {
 }
 
 /// Returns the full path to the local WildFly images TOML file.
-pub fn images_path() -> PathBuf {
-    config_dir().join(IMAGES_FILENAME)
+pub fn wildfly_images_path() -> PathBuf {
+    config_dir().join(WILDFLY_IMAGES_FILENAME)
 }
 
 /// Returns the full path to the local feature packs TOML file.
@@ -123,29 +123,29 @@ pub fn update_all() -> Result<UpdateResult> {
 
 /// Downloads or updates both configuration files from a custom base URL.
 pub fn update_all_with_base_url(base_url: &str) -> Result<UpdateResult> {
-    let images = update_images_with_base_url(base_url)?;
-    let packs = update_feature_packs_with_base_url(base_url)?;
+    let wildfly_images = update_wildfly_images_with_base_url(base_url)?;
+    let feature_packs = update_feature_packs_with_base_url(base_url)?;
     Ok(UpdateResult {
-        images,
-        feature_packs: packs,
+        wildfly_images,
+        feature_packs,
     })
 }
 
 /// Downloads or updates the WildFly images configuration from the default GitHub URL.
-pub fn update_images() -> Result<UpdateStatus> {
-    update_images_with_base_url(DEFAULT_BASE_URL)
+pub fn update_wildfly_images() -> Result<UpdateStatus> {
+    update_wildfly_images_with_base_url(DEFAULT_BASE_URL)
 }
 
 /// Downloads or updates the WildFly images configuration from a custom base URL.
-pub fn update_images_with_base_url(base_url: &str) -> Result<UpdateStatus> {
-    let url = format!("{}/{}", base_url, IMAGES_FILENAME);
-    let local_path = images_path();
+pub fn update_wildfly_images_with_base_url(base_url: &str) -> Result<UpdateStatus> {
+    let url = format!("{}/{}", base_url, WILDFLY_IMAGES_FILENAME);
+    let local_path = wildfly_images_path();
     update_file(
         &url,
         &local_path,
         |content| {
             let config: WildFlyImagesConfig = toml::from_str(content)?;
-            Ok((config.config_version, config.images.len()))
+            Ok((config.config_version, config.wildfly_images.len()))
         },
         |old_content, new_content| {
             let old_registry = WildFlyImageRegistry::from_toml(old_content);
@@ -157,12 +157,12 @@ pub fn update_images_with_base_url(base_url: &str) -> Result<UpdateStatus> {
                     let added = new_keys
                         .difference(&old_keys)
                         .filter_map(|k| new_reg.get(*k))
-                        .map(|img| img.full_name())
+                        .map(|wildfly_image| wildfly_image.full_name())
                         .collect();
                     let removed = old_keys
                         .difference(&new_keys)
                         .filter_map(|k| old_reg.get(*k))
-                        .map(|img| img.full_name())
+                        .map(|wildfly_image| wildfly_image.full_name())
                         .collect();
                     UpdateDiff { added, removed }
                 }
@@ -201,12 +201,12 @@ pub fn update_feature_packs_with_base_url(base_url: &str) -> Result<UpdateStatus
                     let added = new_keys
                         .difference(&old_keys)
                         .filter_map(|(s, v)| new_reg.get(s, v))
-                        .map(|fp| fp.short_name())
+                        .map(|feature_pack| feature_pack.short_name())
                         .collect();
                     let removed = old_keys
                         .difference(&new_keys)
                         .filter_map(|(s, v)| old_reg.get(s, v))
-                        .map(|fp| fp.short_name())
+                        .map(|feature_pack| feature_pack.short_name())
                         .collect();
                     UpdateDiff { added, removed }
                 }
@@ -275,9 +275,12 @@ mod tests {
     }
 
     #[test]
-    fn images_path_filename() {
-        let path = images_path();
-        assert_eq!(path.file_name().unwrap().to_string_lossy(), IMAGES_FILENAME);
+    fn wildfly_images_path_filename() {
+        let path = wildfly_images_path();
+        assert_eq!(
+            path.file_name().unwrap().to_string_lossy(),
+            WILDFLY_IMAGES_FILENAME
+        );
     }
 
     #[test]
@@ -295,7 +298,7 @@ mod tests {
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
         let local = tmp.join("test.toml");
-        let content = "config_version = 1\nimages = []\n";
+        let content = "config_version = 1\nwildfly_images = []\n";
         fs::write(&local, content).unwrap();
         let version: u32 = {
             let c = fs::read_to_string(&local).unwrap();
@@ -360,7 +363,7 @@ mod tests {
     #[test]
     fn update_result_summary() {
         let result = UpdateResult {
-            images: UpdateStatus::AlreadyUpToDate(5),
+            wildfly_images: UpdateStatus::AlreadyUpToDate(5),
             feature_packs: UpdateStatus::Downloaded {
                 version: 3,
                 count: 7,
@@ -376,7 +379,7 @@ mod tests {
         let old_toml = r#"
 config_version = 1
 
-[[images]]
+[[wildfly_images]]
 major = 30
 minor = 0
 version = "30.0.0"
@@ -384,7 +387,7 @@ core_version = "22.0.0"
 suffix = "Final"
 repository = "quay.io/wildfly/wildfly"
 
-[[images]]
+[[wildfly_images]]
 major = 31
 minor = 0
 version = "31.0.0"
@@ -396,7 +399,7 @@ repository = "quay.io/wildfly/wildfly"
         let new_toml = r#"
 config_version = 2
 
-[[images]]
+[[wildfly_images]]
 major = 31
 minor = 0
 version = "31.0.0"
@@ -404,7 +407,7 @@ core_version = "23.0.0"
 suffix = "Final"
 repository = "quay.io/wildfly/wildfly"
 
-[[images]]
+[[wildfly_images]]
 major = 32
 minor = 0
 version = "32.0.0"
@@ -421,12 +424,12 @@ repository = "quay.io/wildfly/wildfly"
         let added: Vec<String> = new_keys
             .difference(&old_keys)
             .filter_map(|k| new_reg.get(*k))
-            .map(|img| img.full_name())
+            .map(|wildfly_image| wildfly_image.full_name())
             .collect();
         let removed: Vec<String> = old_keys
             .difference(&new_keys)
             .filter_map(|k| old_reg.get(*k))
-            .map(|img| img.full_name())
+            .map(|wildfly_image| wildfly_image.full_name())
             .collect();
 
         assert_eq!(added, vec!["WildFly 32.0"]);
@@ -479,12 +482,12 @@ versions = [
         let added: Vec<String> = new_keys
             .difference(&old_keys)
             .filter_map(|(s, v)| new_reg.get(s, v))
-            .map(|fp| fp.short_name())
+            .map(|feature_pack| feature_pack.short_name())
             .collect();
         let removed: Vec<String> = old_keys
             .difference(&new_keys)
             .filter_map(|(s, v)| old_reg.get(s, v))
-            .map(|fp| fp.short_name())
+            .map(|feature_pack| feature_pack.short_name())
             .collect();
 
         assert_eq!(added, vec!["ai 1.0.0"]);

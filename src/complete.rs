@@ -42,21 +42,24 @@ impl Default for CompletionOptions {
 ///
 /// Includes two-digit major versions (e.g. `"34"`), `major.minor` versions (e.g. `"26.1"`),
 /// and `"dev"`.
-pub fn all_wildfly_images(images: &WildFlyImageRegistry) -> Vec<String> {
-    completion_versions(images)
+pub fn all_wildfly_images(wildfly_images: &WildFlyImageRegistry) -> Vec<String> {
+    completion_versions(wildfly_images)
 }
 
 /// Returns all feature pack identifiers for shell completion.
 ///
 /// Includes bare shortcuts (e.g. `"ai"`) and versioned forms (e.g. `"ai:0.9.0"`).
-pub fn all_feature_packs(packs: &FeaturePackRegistry) -> Vec<String> {
-    packs.all_identifiers()
+pub fn all_feature_packs(feature_packs: &FeaturePackRegistry) -> Vec<String> {
+    feature_packs.all_identifiers()
 }
 
 /// Returns all identifiers (WildFly versions and feature packs) for shell completion.
-pub fn all_meta_items(images: &WildFlyImageRegistry, packs: &FeaturePackRegistry) -> Vec<String> {
-    let mut ids = completion_versions(images);
-    ids.extend(packs.all_identifiers());
+pub fn all_meta_items(
+    wildfly_images: &WildFlyImageRegistry,
+    feature_packs: &FeaturePackRegistry,
+) -> Vec<String> {
+    let mut ids = completion_versions(wildfly_images);
+    ids.extend(feature_packs.all_identifiers());
     ids
 }
 
@@ -65,11 +68,11 @@ pub fn all_meta_items(images: &WildFlyImageRegistry, packs: &FeaturePackRegistry
 /// Handles comma-separated lists, range expressions, and multiplier prefixes.
 pub fn suggest_wildfly_images(
     input: &str,
-    images: &WildFlyImageRegistry,
+    wildfly_images: &WildFlyImageRegistry,
     options: &CompletionOptions,
 ) -> Vec<String> {
-    let candidates = completion_versions(images);
-    build_suggestions(input, candidates, Some(images), options)
+    let candidates = completion_versions(wildfly_images);
+    build_suggestions(input, candidates, Some(wildfly_images), options)
 }
 
 /// Returns completion suggestions for feature packs based on a partial input string.
@@ -78,47 +81,48 @@ pub fn suggest_wildfly_images(
 /// applicable to feature packs and are never offered.
 pub fn suggest_feature_packs(
     input: &str,
-    packs: &FeaturePackRegistry,
+    feature_packs: &FeaturePackRegistry,
     options: &CompletionOptions,
 ) -> Vec<String> {
-    let candidates = packs.all_identifiers();
-    let fp_options = CompletionOptions {
+    let candidates = feature_packs.all_identifiers();
+    let feature_pack_options = CompletionOptions {
         ranges: false,
         multipliers: options.multipliers,
     };
-    build_suggestions(input, candidates, None, &fp_options)
+    build_suggestions(input, candidates, None, &feature_pack_options)
 }
 
 /// Returns completion suggestions for both WildFly versions and feature packs based on a
 /// partial input string.
 ///
 /// Handles comma-separated lists, range expressions, and multiplier prefixes.
-/// `image_options` controls which completion features are enabled for WildFly image references,
-/// and `fp_options` controls which completion features are enabled for feature pack references.
-/// Range completions are only offered for WildFly images; `fp_options.ranges` is ignored.
+/// `wildfly_image_options` controls which completion features are enabled for WildFly image references,
+/// and `feature_pack_options` controls which completion features are enabled for feature pack references.
+/// Range completions are only offered for WildFly images; `feature_pack_options.ranges` is ignored.
 pub fn suggest_meta_items(
     input: &str,
-    images: &WildFlyImageRegistry,
-    packs: &FeaturePackRegistry,
-    image_options: &CompletionOptions,
-    fp_options: &CompletionOptions,
+    wildfly_images: &WildFlyImageRegistry,
+    feature_packs: &FeaturePackRegistry,
+    wildfly_image_options: &CompletionOptions,
+    feature_pack_options: &CompletionOptions,
 ) -> Vec<String> {
-    let candidates = all_meta_items(images, packs);
+    let candidates = all_meta_items(wildfly_images, feature_packs);
     let effective = CompletionOptions {
-        ranges: image_options.ranges,
-        multipliers: image_options.multipliers || fp_options.multipliers,
+        ranges: wildfly_image_options.ranges,
+        multipliers: wildfly_image_options.multipliers || feature_pack_options.multipliers,
     };
-    build_suggestions(input, candidates, Some(images), &effective)
+    build_suggestions(input, candidates, Some(wildfly_images), &effective)
 }
 
 fn build_suggestions(
     input: &str,
     candidates: Vec<String>,
-    images: Option<&WildFlyImageRegistry>,
+    wildfly_images: Option<&WildFlyImageRegistry>,
     options: &CompletionOptions,
 ) -> Vec<String> {
     let parameter = if input.is_empty() { None } else { Some(input) };
-    let (prefix, token, suggestions) = find_suggestions(parameter, candidates, images, options);
+    let (prefix, token, suggestions) =
+        find_suggestions(parameter, candidates, wildfly_images, options);
     suggestions
         .into_iter()
         .map(|s| format!("{}{}{}", prefix, token, s))
@@ -128,7 +132,7 @@ fn build_suggestions(
 fn find_suggestions(
     parameter: Option<&str>,
     candidates: Vec<String>,
-    images: Option<&WildFlyImageRegistry>,
+    wildfly_images: Option<&WildFlyImageRegistry>,
     options: &CompletionOptions,
 ) -> (String, String, Vec<String>) {
     let (prefix, token) = parse_prefix_token(parameter);
@@ -145,7 +149,7 @@ fn find_suggestions(
                 Some(remainder)
             };
             let (_, inner_token, inner_suggestions) =
-                find_suggestions_inner(inner_param, &candidates, images, options);
+                find_suggestions_inner(inner_param, &candidates, wildfly_images, options);
             return (
                 prefix.to_string(),
                 format!("{}{}", mult_prefix, inner_token),
@@ -155,42 +159,45 @@ fn find_suggestions(
     }
 
     let (_, out_token, suggestions) =
-        find_suggestions_inner(Some(token), &candidates, images, options);
+        find_suggestions_inner(Some(token), &candidates, wildfly_images, options);
     (prefix.to_string(), out_token, suggestions)
 }
 
 fn find_suggestions_inner(
     token: Option<&str>,
     candidates: &[String],
-    images: Option<&WildFlyImageRegistry>,
+    wildfly_images: Option<&WildFlyImageRegistry>,
     options: &CompletionOptions,
 ) -> (String, String, Vec<String>) {
     let token = token.unwrap_or("");
 
-    if !options.ranges || images.is_none() {
+    if !options.ranges || wildfly_images.is_none() {
         return ("".to_string(), "".to_string(), candidates.to_vec());
     }
 
-    let images = images.unwrap();
+    let wildfly_images = wildfly_images.unwrap();
 
     if token == ".." {
-        let versions: Vec<String> = completion_versions(images).into_iter().skip(1).collect();
+        let versions: Vec<String> = completion_versions(wildfly_images)
+            .into_iter()
+            .skip(1)
+            .collect();
         (String::new(), token.to_string(), versions)
     } else if let Some(after) = token.strip_prefix("..") {
         (
             String::new(),
             token.to_string(),
-            suggest_after_dots(after, 0, 0, images),
+            suggest_after_dots(after, 0, 0, wildfly_images),
         )
     } else if let Some(before) = token.strip_suffix("..") {
-        let versions = try_parse_version(before, images)
-            .map(|(major, minor)| versions_after(major, minor, images))
+        let versions = try_parse_version(before, wildfly_images)
+            .map(|(major, minor)| versions_after(major, minor, wildfly_images))
             .unwrap_or_default();
         (String::new(), token.to_string(), versions)
     } else if token.contains("..") {
         let (before, after) = token.split_once("..").unwrap_or(("", ""));
-        let versions = try_parse_version(before, images)
-            .map(|(major, minor)| suggest_after_dots(after, major, minor, images))
+        let versions = try_parse_version(before, wildfly_images)
+            .map(|(major, minor)| suggest_after_dots(after, major, minor, wildfly_images))
             .unwrap_or_default();
         (String::new(), token.to_string(), versions)
     } else {
@@ -223,11 +230,11 @@ fn parse_prefix_token(parameter: Option<&str>) -> (&str, &str) {
     }
 }
 
-fn completion_versions(images: &WildFlyImageRegistry) -> Vec<String> {
-    let mut versions: Vec<String> = images
+fn completion_versions(wildfly_images: &WildFlyImageRegistry) -> Vec<String> {
+    let mut versions: Vec<String> = wildfly_images
         .all()
         .iter()
-        .map(|img| simple_version(img.identifier))
+        .map(|wildfly_image| simple_version(wildfly_image.identifier))
         .collect();
     versions.push(DEVELOPMENT_VERSION.to_string());
     versions
@@ -242,29 +249,31 @@ fn simple_version(id: u16) -> String {
     }
 }
 
-fn try_parse_version(input: &str, images: &WildFlyImageRegistry) -> Option<(u16, u16)> {
-    parse_wildfly_image(input, images).ok().map(|img| {
-        (
-            identifier_major(img.identifier),
-            identifier_minor(img.identifier),
-        )
-    })
+fn try_parse_version(input: &str, wildfly_images: &WildFlyImageRegistry) -> Option<(u16, u16)> {
+    parse_wildfly_image(input, wildfly_images)
+        .ok()
+        .map(|wildfly_image| {
+            (
+                identifier_major(wildfly_image.identifier),
+                identifier_minor(wildfly_image.identifier),
+            )
+        })
 }
 
-fn versions_after(major: u16, minor: u16, images: &WildFlyImageRegistry) -> Vec<String> {
-    images
+fn versions_after(major: u16, minor: u16, wildfly_images: &WildFlyImageRegistry) -> Vec<String> {
+    wildfly_images
         .all()
         .iter()
-        .filter(|img| {
-            let img_major = identifier_major(img.identifier);
-            let img_minor = identifier_minor(img.identifier);
-            if img_major == major {
-                img_minor > minor
+        .filter(|wildfly_image| {
+            let wildfly_image_major = identifier_major(wildfly_image.identifier);
+            let wildfly_image_minor = identifier_minor(wildfly_image.identifier);
+            if wildfly_image_major == major {
+                wildfly_image_minor > minor
             } else {
-                img_major > major
+                wildfly_image_major > major
             }
         })
-        .map(|img| simple_version(img.identifier))
+        .map(|wildfly_image| simple_version(wildfly_image.identifier))
         .collect()
 }
 
@@ -272,9 +281,9 @@ fn suggest_after_dots(
     after_dots: &str,
     start_major: u16,
     start_minor: u16,
-    images: &WildFlyImageRegistry,
+    wildfly_images: &WildFlyImageRegistry,
 ) -> Vec<String> {
-    if parse_wildfly_image(after_dots, images).is_ok() {
+    if parse_wildfly_image(after_dots, wildfly_images).is_ok() {
         return vec![];
     }
 
@@ -289,22 +298,23 @@ fn suggest_after_dots(
     };
 
     let start_id = crate::wildfly_image::identifier(start_major, start_minor);
-    images
+    wildfly_images
         .all()
         .iter()
-        .filter(|img| img.identifier > start_id)
-        .filter(|img| {
-            let img_major = identifier_major(img.identifier);
-            let img_minor = identifier_minor(img.identifier);
+        .filter(|wildfly_image| wildfly_image.identifier > start_id)
+        .filter(|wildfly_image| {
+            let wildfly_image_major = identifier_major(wildfly_image.identifier);
+            let wildfly_image_minor = identifier_minor(wildfly_image.identifier);
             match number {
                 1..=9 if !after_dots.ends_with('.') => {
-                    img_major >= (number * 10) && img_major < ((number + 1) * 10)
+                    wildfly_image_major >= (number * 10)
+                        && wildfly_image_major < ((number + 1) * 10)
                 }
-                _ => img_major == number && img_minor > 0,
+                _ => wildfly_image_major == number && wildfly_image_minor > 0,
             }
         })
-        .map(|img| {
-            let v = simple_version(img.identifier);
+        .map(|wildfly_image| {
+            let v = simple_version(wildfly_image.identifier);
             v.strip_prefix(after_dots).unwrap_or(&v).to_string()
         })
         .collect()
@@ -314,11 +324,11 @@ fn suggest_after_dots(
 mod tests {
     use super::*;
 
-    fn image_registry() -> WildFlyImageRegistry {
+    fn wildfly_image_registry() -> WildFlyImageRegistry {
         WildFlyImageRegistry::from_toml(include_str!("../wildfly-images.toml")).unwrap()
     }
 
-    fn fp_registry() -> FeaturePackRegistry {
+    fn feature_pack_registry() -> FeaturePackRegistry {
         FeaturePackRegistry::from_toml(include_str!("../feature-packs.toml")).unwrap()
     }
 
@@ -326,8 +336,8 @@ mod tests {
 
     #[test]
     fn all_wildfly_images_includes_versions_and_dev() {
-        let images = image_registry();
-        let ids = all_wildfly_images(&images);
+        let wildfly_images = wildfly_image_registry();
+        let ids = all_wildfly_images(&wildfly_images);
         assert!(ids.contains(&"34".to_string()));
         assert!(ids.contains(&"26.1".to_string()));
         assert!(ids.contains(&"dev".to_string()));
@@ -335,16 +345,16 @@ mod tests {
 
     #[test]
     fn all_wildfly_images_excludes_feature_packs() {
-        let images = image_registry();
-        let ids = all_wildfly_images(&images);
+        let wildfly_images = wildfly_image_registry();
+        let ids = all_wildfly_images(&wildfly_images);
         assert!(!ids.contains(&"ai".to_string()));
         assert!(!ids.contains(&"ai:0.9.0".to_string()));
     }
 
     #[test]
     fn all_wildfly_images_no_duplicates() {
-        let images = image_registry();
-        let ids = all_wildfly_images(&images);
+        let wildfly_images = wildfly_image_registry();
+        let ids = all_wildfly_images(&wildfly_images);
         let mut deduped = ids.clone();
         deduped.sort();
         deduped.dedup();
@@ -355,8 +365,8 @@ mod tests {
 
     #[test]
     fn all_feature_packs_includes_shortcuts_and_versioned() {
-        let packs = fp_registry();
-        let ids = all_feature_packs(&packs);
+        let feature_packs = feature_pack_registry();
+        let ids = all_feature_packs(&feature_packs);
         assert!(ids.contains(&"ai".to_string()));
         assert!(ids.contains(&"ai:0.9.0".to_string()));
         assert!(ids.contains(&"grpc".to_string()));
@@ -364,16 +374,16 @@ mod tests {
 
     #[test]
     fn all_feature_packs_excludes_versions() {
-        let packs = fp_registry();
-        let ids = all_feature_packs(&packs);
+        let feature_packs = feature_pack_registry();
+        let ids = all_feature_packs(&feature_packs);
         assert!(!ids.contains(&"34".to_string()));
         assert!(!ids.contains(&"dev".to_string()));
     }
 
     #[test]
     fn all_feature_packs_includes_all_shortcuts() {
-        let packs = fp_registry();
-        let ids = all_feature_packs(&packs);
+        let feature_packs = feature_pack_registry();
+        let ids = all_feature_packs(&feature_packs);
         for shortcut in &["ai", "graphql", "grpc", "keycloak", "myfaces"] {
             assert!(ids.contains(&shortcut.to_string()), "Missing: {}", shortcut);
         }
@@ -383,9 +393,9 @@ mod tests {
 
     #[test]
     fn all_meta_items_includes_both() {
-        let images = image_registry();
-        let packs = fp_registry();
-        let ids = all_meta_items(&images, &packs);
+        let wildfly_images = wildfly_image_registry();
+        let feature_packs = feature_pack_registry();
+        let ids = all_meta_items(&wildfly_images, &feature_packs);
         assert!(ids.contains(&"34".to_string()));
         assert!(ids.contains(&"26.1".to_string()));
         assert!(ids.contains(&"dev".to_string()));
@@ -395,9 +405,9 @@ mod tests {
 
     #[test]
     fn all_meta_items_no_duplicates() {
-        let images = image_registry();
-        let packs = fp_registry();
-        let ids = all_meta_items(&images, &packs);
+        let wildfly_images = wildfly_image_registry();
+        let feature_packs = feature_pack_registry();
+        let ids = all_meta_items(&wildfly_images, &feature_packs);
         let mut deduped = ids.clone();
         deduped.sort();
         deduped.dedup();
@@ -407,103 +417,103 @@ mod tests {
     // ------------------------------------------------------ suggest_wildfly_images
 
     #[test]
-    fn suggest_wf_empty_returns_all_versions() {
-        let images = image_registry();
-        let results = suggest_wildfly_images("", &images, &CompletionOptions::all());
+    fn suggest_wildfly_empty_returns_all_versions() {
+        let wildfly_images = wildfly_image_registry();
+        let results = suggest_wildfly_images("", &wildfly_images, &CompletionOptions::all());
         assert!(results.contains(&"34".to_string()));
         assert!(results.contains(&"dev".to_string()));
         assert!(!results.contains(&"ai".to_string()));
     }
 
     #[test]
-    fn suggest_wf_after_comma() {
-        let images = image_registry();
-        let results = suggest_wildfly_images("34,", &images, &CompletionOptions::all());
+    fn suggest_wildfly_after_comma() {
+        let wildfly_images = wildfly_image_registry();
+        let results = suggest_wildfly_images("34,", &wildfly_images, &CompletionOptions::all());
         assert!(results.iter().all(|r| r.starts_with("34,")));
         assert!(!results.is_empty());
     }
 
     #[test]
-    fn suggest_wf_range_bare_dots() {
-        let images = image_registry();
-        let results = suggest_wildfly_images("..", &images, &CompletionOptions::all());
+    fn suggest_wildfly_range_bare_dots() {
+        let wildfly_images = wildfly_image_registry();
+        let results = suggest_wildfly_images("..", &wildfly_images, &CompletionOptions::all());
         assert!(!results.is_empty());
-        let versions = completion_versions(&images);
+        let versions = completion_versions(&wildfly_images);
         assert!(!results.contains(&format!("..{}", versions[0])));
     }
 
     #[test]
-    fn suggest_wf_range_start() {
-        let images = image_registry();
-        let results = suggest_wildfly_images("20..", &images, &CompletionOptions::all());
+    fn suggest_wildfly_range_start() {
+        let wildfly_images = wildfly_image_registry();
+        let results = suggest_wildfly_images("20..", &wildfly_images, &CompletionOptions::all());
         assert!(!results.is_empty());
         assert!(results.iter().all(|r| r.starts_with("20..")));
     }
 
     #[test]
-    fn suggest_wf_range_dots_2() {
-        let images = image_registry();
-        let results = suggest_wildfly_images("..2", &images, &CompletionOptions::all());
+    fn suggest_wildfly_range_dots_2() {
+        let wildfly_images = wildfly_image_registry();
+        let results = suggest_wildfly_images("..2", &wildfly_images, &CompletionOptions::all());
         assert!(results.contains(&"..20".to_string()));
         assert!(results.contains(&"..26.1".to_string()));
     }
 
     #[test]
-    fn suggest_wf_range_complete() {
-        let images = image_registry();
-        let results = suggest_wildfly_images("20..25", &images, &CompletionOptions::all());
+    fn suggest_wildfly_range_complete() {
+        let wildfly_images = wildfly_image_registry();
+        let results = suggest_wildfly_images("20..25", &wildfly_images, &CompletionOptions::all());
         assert!(results.is_empty());
     }
 
     #[test]
-    fn suggest_wf_range_26_dots_2() {
-        let images = image_registry();
-        let results = suggest_wildfly_images("26..2", &images, &CompletionOptions::all());
+    fn suggest_wildfly_range_26_dots_2() {
+        let wildfly_images = wildfly_image_registry();
+        let results = suggest_wildfly_images("26..2", &wildfly_images, &CompletionOptions::all());
         assert!(results.iter().all(|r| r.starts_with("26..2")));
         assert!(results.contains(&"26..27".to_string()));
     }
 
     #[test]
-    fn suggest_wf_range_261_dots_2() {
-        let images = image_registry();
-        let results = suggest_wildfly_images("26.1..2", &images, &CompletionOptions::all());
+    fn suggest_wildfly_range_261_dots_2() {
+        let wildfly_images = wildfly_image_registry();
+        let results = suggest_wildfly_images("26.1..2", &wildfly_images, &CompletionOptions::all());
         assert!(results.iter().all(|r| r.starts_with("26.1..2")));
         assert!(results.contains(&"26.1..27".to_string()));
     }
 
     #[test]
-    fn suggest_wf_invalid_range_start() {
-        let images = image_registry();
-        let results = suggest_wildfly_images("foo..", &images, &CompletionOptions::all());
+    fn suggest_wildfly_invalid_range_start() {
+        let wildfly_images = wildfly_image_registry();
+        let results = suggest_wildfly_images("foo..", &wildfly_images, &CompletionOptions::all());
         assert!(results.is_empty());
     }
 
     #[test]
-    fn suggest_wf_invalid_range_end() {
-        let images = image_registry();
-        let results = suggest_wildfly_images("..foo", &images, &CompletionOptions::all());
+    fn suggest_wildfly_invalid_range_end() {
+        let wildfly_images = wildfly_image_registry();
+        let results = suggest_wildfly_images("..foo", &wildfly_images, &CompletionOptions::all());
         assert!(results.is_empty());
     }
 
     #[test]
-    fn suggest_wf_no_options() {
-        let images = image_registry();
-        let results = suggest_wildfly_images("", &images, &CompletionOptions::none());
+    fn suggest_wildfly_no_options() {
+        let wildfly_images = wildfly_image_registry();
+        let results = suggest_wildfly_images("", &wildfly_images, &CompletionOptions::none());
         assert!(results.contains(&"34".to_string()));
         assert!(results.contains(&"dev".to_string()));
     }
 
     #[test]
-    fn suggest_wf_no_options_no_comma_prefix() {
-        let images = image_registry();
-        let results = suggest_wildfly_images("34,", &images, &CompletionOptions::none());
+    fn suggest_wildfly_no_options_no_comma_prefix() {
+        let wildfly_images = wildfly_image_registry();
+        let results = suggest_wildfly_images("34,", &wildfly_images, &CompletionOptions::none());
         assert!(!results.iter().any(|r| r.starts_with("34,")));
     }
 
     #[test]
-    fn suggest_wf_multiplier() {
-        let images = image_registry();
-        let results = suggest_wildfly_images("3x", &images, &CompletionOptions::all());
+    fn suggest_wildfly_multiplier() {
+        let wildfly_images = wildfly_image_registry();
+        let results = suggest_wildfly_images("3x", &wildfly_images, &CompletionOptions::all());
         assert!(!results.is_empty());
         assert!(results.iter().all(|r| r.starts_with("3x")));
         assert!(results.contains(&"3x34".to_string()));
@@ -511,28 +521,28 @@ mod tests {
     }
 
     #[test]
-    fn suggest_wf_multiplier_with_range() {
-        let images = image_registry();
-        let results = suggest_wildfly_images("2x20..", &images, &CompletionOptions::all());
+    fn suggest_wildfly_multiplier_with_range() {
+        let wildfly_images = wildfly_image_registry();
+        let results = suggest_wildfly_images("2x20..", &wildfly_images, &CompletionOptions::all());
         assert!(!results.is_empty());
         assert!(results.iter().all(|r| r.starts_with("2x20..")));
     }
 
     #[test]
-    fn suggest_wf_multiplier_disabled() {
-        let images = image_registry();
+    fn suggest_wildfly_multiplier_disabled() {
+        let wildfly_images = wildfly_image_registry();
         let opts = CompletionOptions {
             ranges: true,
             multipliers: false,
         };
-        let results = suggest_wildfly_images("3x", &images, &opts);
+        let results = suggest_wildfly_images("3x", &wildfly_images, &opts);
         assert!(results.is_empty() || !results.iter().any(|r| r.starts_with("3x")));
     }
 
     #[test]
-    fn suggest_wf_comma_then_range() {
-        let images = image_registry();
-        let results = suggest_wildfly_images("34,20..", &images, &CompletionOptions::all());
+    fn suggest_wildfly_comma_then_range() {
+        let wildfly_images = wildfly_image_registry();
+        let results = suggest_wildfly_images("34,20..", &wildfly_images, &CompletionOptions::all());
         assert!(results.iter().all(|r| r.starts_with("34,20..")));
         assert!(!results.is_empty());
     }
@@ -540,50 +550,50 @@ mod tests {
     // ------------------------------------------------------ suggest_feature_packs
 
     #[test]
-    fn suggest_fp_empty_returns_all() {
-        let packs = fp_registry();
-        let results = suggest_feature_packs("", &packs, &CompletionOptions::all());
+    fn suggest_feature_pack_empty_returns_all() {
+        let feature_packs = feature_pack_registry();
+        let results = suggest_feature_packs("", &feature_packs, &CompletionOptions::all());
         assert!(results.contains(&"ai".to_string()));
         assert!(results.contains(&"grpc".to_string()));
         assert!(results.contains(&"ai:0.9.0".to_string()));
     }
 
     #[test]
-    fn suggest_fp_excludes_versions() {
-        let packs = fp_registry();
-        let results = suggest_feature_packs("", &packs, &CompletionOptions::all());
+    fn suggest_feature_pack_excludes_versions() {
+        let feature_packs = feature_pack_registry();
+        let results = suggest_feature_packs("", &feature_packs, &CompletionOptions::all());
         assert!(!results.contains(&"34".to_string()));
         assert!(!results.contains(&"dev".to_string()));
     }
 
     #[test]
-    fn suggest_fp_after_comma() {
-        let packs = fp_registry();
-        let results = suggest_feature_packs("ai,", &packs, &CompletionOptions::all());
+    fn suggest_feature_pack_after_comma() {
+        let feature_packs = feature_pack_registry();
+        let results = suggest_feature_packs("ai,", &feature_packs, &CompletionOptions::all());
         assert!(results.iter().all(|r| r.starts_with("ai,")));
         assert!(!results.is_empty());
     }
 
     #[test]
-    fn suggest_fp_multiplier() {
-        let packs = fp_registry();
-        let results = suggest_feature_packs("2x", &packs, &CompletionOptions::all());
+    fn suggest_feature_pack_multiplier() {
+        let feature_packs = feature_pack_registry();
+        let results = suggest_feature_packs("2x", &feature_packs, &CompletionOptions::all());
         assert!(!results.is_empty());
         assert!(results.iter().all(|r| r.starts_with("2x")));
         assert!(results.contains(&"2xai".to_string()));
     }
 
     #[test]
-    fn suggest_fp_no_ranges() {
-        let packs = fp_registry();
-        let results = suggest_feature_packs("..", &packs, &CompletionOptions::all());
+    fn suggest_feature_pack_no_ranges() {
+        let feature_packs = feature_pack_registry();
+        let results = suggest_feature_packs("..", &feature_packs, &CompletionOptions::all());
         assert!(results.iter().all(|r| !r.contains("..")));
     }
 
     #[test]
-    fn suggest_fp_no_options() {
-        let packs = fp_registry();
-        let results = suggest_feature_packs("", &packs, &CompletionOptions::none());
+    fn suggest_feature_pack_no_options() {
+        let feature_packs = feature_pack_registry();
+        let results = suggest_feature_packs("", &feature_packs, &CompletionOptions::none());
         assert!(results.contains(&"ai".to_string()));
     }
 
@@ -591,12 +601,12 @@ mod tests {
 
     #[test]
     fn suggest_meta_empty_returns_all() {
-        let images = image_registry();
-        let packs = fp_registry();
+        let wildfly_images = wildfly_image_registry();
+        let feature_packs = feature_pack_registry();
         let results = suggest_meta_items(
             "",
-            &images,
-            &packs,
+            &wildfly_images,
+            &feature_packs,
             &CompletionOptions::all(),
             &CompletionOptions::all(),
         );
@@ -607,12 +617,12 @@ mod tests {
 
     #[test]
     fn suggest_meta_after_comma() {
-        let images = image_registry();
-        let packs = fp_registry();
+        let wildfly_images = wildfly_image_registry();
+        let feature_packs = feature_pack_registry();
         let results = suggest_meta_items(
             "34,",
-            &images,
-            &packs,
+            &wildfly_images,
+            &feature_packs,
             &CompletionOptions::all(),
             &CompletionOptions::all(),
         );
@@ -622,12 +632,12 @@ mod tests {
 
     #[test]
     fn suggest_meta_range() {
-        let images = image_registry();
-        let packs = fp_registry();
+        let wildfly_images = wildfly_image_registry();
+        let feature_packs = feature_pack_registry();
         let results = suggest_meta_items(
             "20..",
-            &images,
-            &packs,
+            &wildfly_images,
+            &feature_packs,
             &CompletionOptions::all(),
             &CompletionOptions::all(),
         );
@@ -637,12 +647,12 @@ mod tests {
 
     #[test]
     fn suggest_meta_multiplier() {
-        let images = image_registry();
-        let packs = fp_registry();
+        let wildfly_images = wildfly_image_registry();
+        let feature_packs = feature_pack_registry();
         let results = suggest_meta_items(
             "3x",
-            &images,
-            &packs,
+            &wildfly_images,
+            &feature_packs,
             &CompletionOptions::all(),
             &CompletionOptions::all(),
         );
@@ -654,12 +664,12 @@ mod tests {
 
     #[test]
     fn suggest_meta_multiplier_with_range() {
-        let images = image_registry();
-        let packs = fp_registry();
+        let wildfly_images = wildfly_image_registry();
+        let feature_packs = feature_pack_registry();
         let results = suggest_meta_items(
             "2x20..",
-            &images,
-            &packs,
+            &wildfly_images,
+            &feature_packs,
             &CompletionOptions::all(),
             &CompletionOptions::all(),
         );
@@ -669,12 +679,12 @@ mod tests {
 
     #[test]
     fn suggest_meta_no_options() {
-        let images = image_registry();
-        let packs = fp_registry();
+        let wildfly_images = wildfly_image_registry();
+        let feature_packs = feature_pack_registry();
         let results = suggest_meta_items(
             "",
-            &images,
-            &packs,
+            &wildfly_images,
+            &feature_packs,
             &CompletionOptions::none(),
             &CompletionOptions::none(),
         );
@@ -684,12 +694,12 @@ mod tests {
 
     #[test]
     fn suggest_meta_comma_then_range() {
-        let images = image_registry();
-        let packs = fp_registry();
+        let wildfly_images = wildfly_image_registry();
+        let feature_packs = feature_pack_registry();
         let results = suggest_meta_items(
             "34,20..",
-            &images,
-            &packs,
+            &wildfly_images,
+            &feature_packs,
             &CompletionOptions::all(),
             &CompletionOptions::all(),
         );
@@ -699,12 +709,12 @@ mod tests {
 
     #[test]
     fn suggest_meta_multiple_commas() {
-        let images = image_registry();
-        let packs = fp_registry();
+        let wildfly_images = wildfly_image_registry();
+        let feature_packs = feature_pack_registry();
         let results = suggest_meta_items(
             "10,26,..2",
-            &images,
-            &packs,
+            &wildfly_images,
+            &feature_packs,
             &CompletionOptions::all(),
             &CompletionOptions::all(),
         );
@@ -713,12 +723,12 @@ mod tests {
 
     #[test]
     fn suggest_meta_dots_26_dot() {
-        let images = image_registry();
-        let packs = fp_registry();
+        let wildfly_images = wildfly_image_registry();
+        let feature_packs = feature_pack_registry();
         let results = suggest_meta_items(
             "..26.",
-            &images,
-            &packs,
+            &wildfly_images,
+            &feature_packs,
             &CompletionOptions::all(),
             &CompletionOptions::all(),
         );
@@ -727,12 +737,12 @@ mod tests {
 
     #[test]
     fn suggest_meta_dots_1000() {
-        let images = image_registry();
-        let packs = fp_registry();
+        let wildfly_images = wildfly_image_registry();
+        let feature_packs = feature_pack_registry();
         let results = suggest_meta_items(
             "..1000",
-            &images,
-            &packs,
+            &wildfly_images,
+            &feature_packs,
             &CompletionOptions::all(),
             &CompletionOptions::all(),
         );
@@ -743,12 +753,12 @@ mod tests {
 
     #[test]
     fn suggest_meta_mixed_ranges_for_images_only() {
-        let images = image_registry();
-        let packs = fp_registry();
+        let wildfly_images = wildfly_image_registry();
+        let feature_packs = feature_pack_registry();
         let results = suggest_meta_items(
             "20..",
-            &images,
-            &packs,
+            &wildfly_images,
+            &feature_packs,
             &CompletionOptions::all(),
             &CompletionOptions::none(),
         );
@@ -758,12 +768,12 @@ mod tests {
 
     #[test]
     fn suggest_meta_no_ranges_when_image_opts_disable() {
-        let images = image_registry();
-        let packs = fp_registry();
+        let wildfly_images = wildfly_image_registry();
+        let feature_packs = feature_pack_registry();
         let results = suggest_meta_items(
             "20..",
-            &images,
-            &packs,
+            &wildfly_images,
+            &feature_packs,
             &CompletionOptions::none(),
             &CompletionOptions::all(),
         );
@@ -804,8 +814,8 @@ mod tests {
 
     #[test]
     fn completion_versions_format() {
-        let images = image_registry();
-        let versions = completion_versions(&images);
+        let wildfly_images = wildfly_image_registry();
+        let versions = completion_versions(&wildfly_images);
         assert!(versions.contains(&"10".to_string()));
         assert!(versions.contains(&"26.1".to_string()));
         assert!(versions.contains(&"dev".to_string()));
@@ -815,8 +825,8 @@ mod tests {
 
     #[test]
     fn completion_versions_no_duplicates() {
-        let images = image_registry();
-        let versions = completion_versions(&images);
+        let wildfly_images = wildfly_image_registry();
+        let versions = completion_versions(&wildfly_images);
         let mut deduped = versions.clone();
         deduped.sort();
         deduped.dedup();

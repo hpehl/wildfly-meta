@@ -17,11 +17,11 @@
 //! println!("{}", result.summary());
 //!
 //! // Load registries
-//! let images = WildFlyImageRegistry::load_default().expect("failed to load images");
-//! let packs = FeaturePackRegistry::load_default().expect("failed to load feature packs");
+//! let wildfly_images = WildFlyImageRegistry::load_default().expect("failed to load images");
+//! let feature_packs = FeaturePackRegistry::load_default().expect("failed to load feature packs");
 //!
 //! // Parse a version expression
-//! let items = parse_meta_items("34,dev,ai", &images, &packs, &ParseOptions::all(), &ParseOptions::all()).unwrap();
+//! let items = parse_meta_items("34,dev,ai", &wildfly_images, &feature_packs, &ParseOptions::all(), &ParseOptions::all()).unwrap();
 //! for item in &items {
 //!     println!("{}", item.short_name());
 //! }
@@ -59,10 +59,10 @@ pub use parse::{
     parse_wildfly_image, parse_wildfly_images, ParseOptions,
 };
 pub use update::{
-    config_dir, feature_packs_path, images_path, update_all, update_all_with_base_url,
-    update_feature_packs, update_feature_packs_with_base_url, update_images,
-    update_images_with_base_url, UpdateDiff, UpdateResult, UpdateStatus, FEATURE_PACKS_FILENAME,
-    IMAGES_FILENAME,
+    config_dir, feature_packs_path, update_all, update_all_with_base_url, update_feature_packs,
+    update_feature_packs_with_base_url, update_wildfly_images, update_wildfly_images_with_base_url,
+    wildfly_images_path, UpdateDiff, UpdateResult, UpdateStatus, FEATURE_PACKS_FILENAME,
+    WILDFLY_IMAGES_FILENAME,
 };
 pub use wildfly_image::{
     identifier, identifier_major, identifier_minor, wildfly_dev, WildFlyImage,

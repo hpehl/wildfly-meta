@@ -25,7 +25,8 @@ Multi-file library crate with no binary targets:
 - **`src/wildfly_image.rs`** — `WildFlyImage` struct, `WildFlyImageRegistry` for loading/querying container images from TOML, `wildfly_dev()` helper, and `identifier()` for computing version IDs
 - **`src/feature_pack.rs`** — `FeaturePack` struct and `FeaturePackRegistry` for loading/querying feature pack metadata from TOML
 - **`src/meta_item.rs`** — `MetaItem` enum wrapping both `WildFlyImage` and `FeaturePack` with unified accessors
-- **`src/parse.rs`** — Unified expression parser supporting a mini-DSL: `"3x10,23..26,5x28,34,dev,ai"`. `ParseOptions` controls which registries are consulted
+- **`src/parse.rs`** — Unified expression parser supporting a mini-DSL: `"3x10,23..26,5x28,34,dev,ai"`. Separate `ParseOptions` for WildFly images and feature packs
+- **`src/complete.rs`** — Shell completion helpers: `suggest_wildfly_images`, `suggest_feature_packs`, `suggest_meta_items`, and `all_*` identifier functions. `CompletionOptions` controls ranges and multipliers
 - **`src/update.rs`** — On-demand download of TOML files from GitHub (`main` branch) to `~/.config/wildfly-meta/`. Compares `config_version` to decide whether to re-download. Exports `UpdateStatus` enum
 - **`src/lib.rs`** — Public re-exports of all types, functions, and constants
 

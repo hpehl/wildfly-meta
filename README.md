@@ -10,14 +10,14 @@ Add the dependency to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-wildfly_meta = "0.1"
+wildfly_meta = "0.2"
 ```
 
 ```rust
 use anyhow::Result;
 use wildfly_meta::{
     update_all, WildFlyImageRegistry, FeaturePackRegistry,
-    parse_list, ParseOptions, MetaItem,
+    parse_meta_items, ParseOptions, MetaItem,
 };
 
 fn main() -> Result<()> {
@@ -26,11 +26,11 @@ fn main() -> Result<()> {
     println!("{}", result.summary());
 
     // Load registries
-    let images = WildFlyImageRegistry::load_default()?;
-    let packs = FeaturePackRegistry::load_default()?;
+    let wildfly_images = WildFlyImageRegistry::load_default()?;
+    let feature_packs = FeaturePackRegistry::load_default()?;
 
     // Parse a mixed expression
-    let items = parse_list("34,35,ai", &images, &packs, &ParseOptions::all())?;
+    let items = parse_meta_items("34,35,ai", &wildfly_images, &feature_packs, &ParseOptions::all(), &ParseOptions::all())?;
     for item in &items {
         println!("{}", item.full_name());
     }
@@ -139,42 +139,43 @@ The library provides parsing functions for version expressions that can referenc
 ### Single Items
 
 ```rust
-use wildfly_meta::{parse_image, parse_feature_pack, parse_item};
+use wildfly_meta::{parse_wildfly_image, parse_feature_pack, parse_meta_item};
 
-// Parse a single image: "dev", "34", or "26.1"
-let img = parse_image("34", &images)?;
+// Parse a single WildFly image: "dev", "34", or "26.1"
+let wildfly_image = parse_wildfly_image("34", &wildfly_images)?;
 
 // Parse a single feature pack: "ai" (latest) or "ai:0.9.0" (specific version)
-let fp = parse_feature_pack("ai", &packs)?;
+let feature_pack = parse_feature_pack("ai", &feature_packs)?;
 
 // Parse either type (feature packs take priority on name collision)
-let item = parse_item("ai", &images, &packs)?;
+let meta_item = parse_meta_item("ai", &wildfly_images, &feature_packs)?;
 ```
 
 ### Lists and Expressions
 
-`parse_list` parses comma-separated expressions with optional support for ranges (`..`) and multipliers (`Nx`), controlled by `ParseOptions`:
+`parse_meta_items` parses comma-separated expressions with optional support for ranges (`..`) and multipliers (`Nx`), controlled by separate `ParseOptions` for WildFly images and feature packs:
 
 ```rust
-use wildfly_meta::{parse_list, ParseOptions};
+use wildfly_meta::{parse_meta_items, ParseOptions};
 
-let options = ParseOptions::all();  // enable ranges and multipliers
+let image_options = ParseOptions::all();   // enable ranges and multipliers for images
+let fp_options = ParseOptions::all();      // enable multipliers for feature packs
 
 // Plain versions and feature packs
-let items = parse_list("34,35,ai", &images, &packs, &options)?;
+let items = parse_meta_items("34,35,ai", &wildfly_images, &feature_packs, &image_options, &fp_options)?;
 
 // Ranges: all versions from 23 to 26
-let items = parse_list("23..26", &images, &packs, &options)?;
+let items = parse_meta_items("23..26", &wildfly_images, &feature_packs, &image_options, &fp_options)?;
 
 // Open ranges: from 30 to newest, or oldest to 26
-let items = parse_list("30..", &images, &packs, &options)?;
-let items = parse_list("..26", &images, &packs, &options)?;
+let items = parse_meta_items("30..", &wildfly_images, &feature_packs, &image_options, &fp_options)?;
+let items = parse_meta_items("..26", &wildfly_images, &feature_packs, &image_options, &fp_options)?;
 
 // Multipliers: three copies of version 34
-let items = parse_list("3x34", &images, &packs, &options)?;
+let items = parse_meta_items("3x34", &wildfly_images, &feature_packs, &image_options, &fp_options)?;
 
 // Complex mixed expression
-let items = parse_list("3x10,23..26,5x28,34,dev,ai", &images, &packs, &options)?;
+let items = parse_meta_items("3x10,23..26,5x28,34,dev,ai", &wildfly_images, &feature_packs, &image_options, &fp_options)?;
 ```
 
 `ParseOptions` controls which syntax elements are enabled:
@@ -186,7 +187,7 @@ let items = parse_list("3x10,23..26,5x28,34,dev,ai", &images, &packs, &options)?
 
 ### `MetaItem`
 
-`MetaItem` is the unified enum returned by `parse_item` and `parse_list`:
+`MetaItem` is the unified enum returned by `parse_meta_item` and `parse_meta_items`:
 
 ```rust
 pub enum MetaItem {
@@ -209,14 +210,14 @@ pub enum MetaItem {
 Configuration files are downloaded from the [wildfly-meta](https://github.com/hpehl/wildfly-meta) repository on GitHub and stored in `~/.config/wildfly-meta/`. A `config_version` field in each TOML file controls whether a re-download is needed.
 
 ```rust
-use wildfly_meta::{update_all, update_images, update_feature_packs, UpdateStatus};
+use wildfly_meta::{update_all, update_wildfly_images, update_feature_packs, UpdateStatus};
 
 // Update both files at once
 let result = update_all()?;
 println!("{}", result.summary());
 
 // Update individually
-let status = update_images()?;
+let status = update_wildfly_images()?;
 match status {
     UpdateStatus::Downloaded { version, count } => { /* first download */ }
     UpdateStatus::Updated { from_version, to_version, diff } => {
@@ -232,7 +233,7 @@ Path helpers:
 | Function | Returns |
 |----------|---------|
 | `config_dir()` | `~/.config/wildfly-meta` |
-| `images_path()` | `~/.config/wildfly-meta/wildfly-images.toml` |
+| `wildfly_images_path()` | `~/.config/wildfly-meta/wildfly-images.toml` |
 | `feature_packs_path()` | `~/.config/wildfly-meta/feature-packs.toml` |
 
 ## Shell Completion
@@ -240,19 +241,23 @@ Path helpers:
 The library provides helpers for implementing shell tab-completion in CLI tools.
 
 ```rust
-use wildfly_meta::{all_identifiers, suggest, CompletionOptions};
+use wildfly_meta::{
+    all_wildfly_images, all_feature_packs, all_meta_items,
+    suggest_wildfly_images, suggest_feature_packs, suggest_meta_items,
+    CompletionOptions,
+};
 
 let options = CompletionOptions {
-    feature_packs: true,
     ranges: true,
+    multipliers: true,
 };
 
 // Get all available identifiers for completion
-let ids = all_identifiers(&images, &packs, &options);
+let ids = all_meta_items(&wildfly_images, &feature_packs);
 
 // Get context-aware suggestions for partial input
-let suggestions = suggest("34,", &images, &packs, &options);   // fresh after comma
-let suggestions = suggest("20..", &images, &packs, &options);   // range completion
+let suggestions = suggest_meta_items("34,", &wildfly_images, &feature_packs, &options, &options);
+let suggestions = suggest_meta_items("20..", &wildfly_images, &feature_packs, &options, &options);
 ```
 
 ## Data Files
@@ -264,7 +269,7 @@ Two TOML files in the repository root serve as the canonical data source:
 ```toml
 config_version = 5
 
-[[images]]
+[[wildfly_images]]
 major = 35
 minor = 0
 version = "35.0.1"
@@ -274,7 +279,7 @@ repository = "quay.io/wildfly/wildfly"
 platforms = ["linux/amd64", "linux/arm64", "linux/s390x", "linux/ppc64le"]
 ```
 
-To add a new WildFly version, append an `[[images]]` entry and increment `config_version`. No code changes or library release needed.
+To add a new WildFly version, append a `[[wildfly_images]]` entry and increment `config_version`. No code changes or library release needed.
 
 ### `feature-packs.toml`
 

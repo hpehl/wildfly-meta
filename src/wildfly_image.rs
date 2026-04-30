@@ -9,7 +9,7 @@ use anyhow::Result;
 use semver::Version;
 use serde::Deserialize;
 
-use crate::update::images_path;
+use crate::update::wildfly_images_path;
 
 /// The version string used to refer to the WildFly development build (e.g. `"dev"`).
 pub static DEVELOPMENT_VERSION: &str = "dev";
@@ -121,7 +121,7 @@ impl PartialOrd for WildFlyImage {
 #[derive(Debug, Deserialize)]
 pub(crate) struct WildFlyImagesConfig {
     pub config_version: u32,
-    pub images: Vec<WildFlyImageEntry>,
+    pub wildfly_images: Vec<WildFlyImageEntry>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -141,13 +141,13 @@ pub(crate) struct WildFlyImageEntry {
 /// Images are stored in a [`BTreeMap`] keyed by their numeric identifier, so iteration
 /// is always in version order (oldest to newest).
 pub struct WildFlyImageRegistry {
-    images: BTreeMap<u16, WildFlyImage>,
+    wildfly_images: BTreeMap<u16, WildFlyImage>,
 }
 
 impl WildFlyImageRegistry {
     /// Loads the image registry from the default configuration path (`~/.config/wildfly-meta/wildfly-images.toml`).
     pub fn load_default() -> Result<Self> {
-        Self::load(&images_path())
+        Self::load(&wildfly_images_path())
     }
 
     /// Loads the image registry from the given TOML file path.
@@ -159,10 +159,10 @@ impl WildFlyImageRegistry {
     /// Parses the image registry from a TOML string.
     pub fn from_toml(content: &str) -> Result<Self> {
         let config: WildFlyImagesConfig = toml::from_str(content)?;
-        let mut images = BTreeMap::new();
-        for entry in config.images {
+        let mut wildfly_images = BTreeMap::new();
+        for entry in config.wildfly_images {
             let id = identifier(entry.major, entry.minor);
-            let image = WildFlyImage {
+            let wildfly_image = WildFlyImage {
                 identifier: id,
                 short_version: format!("{}.{}", entry.major, entry.minor),
                 version: entry.version,
@@ -171,49 +171,52 @@ impl WildFlyImageRegistry {
                 repository: entry.repository,
                 platforms: entry.platforms,
             };
-            images.insert(id, image);
+            wildfly_images.insert(id, wildfly_image);
         }
-        Ok(Self { images })
+        Ok(Self { wildfly_images })
     }
 
     /// Returns the image with the given identifier, or `None` if not found.
     pub fn get(&self, id: u16) -> Option<&WildFlyImage> {
-        self.images.get(&id)
+        self.wildfly_images.get(&id)
     }
 
     /// Returns the oldest (lowest identifier) image in the registry.
     pub fn first(&self) -> Option<&WildFlyImage> {
-        self.images.first_key_value().map(|(_, v)| v)
+        self.wildfly_images.first_key_value().map(|(_, v)| v)
     }
 
     /// Returns the newest (highest identifier) image in the registry.
     pub fn last(&self) -> Option<&WildFlyImage> {
-        self.images.last_key_value().map(|(_, v)| v)
+        self.wildfly_images.last_key_value().map(|(_, v)| v)
     }
 
     /// Returns all images with identifiers in the inclusive range `[from, to]`.
     pub fn range(&self, from: u16, to: u16) -> Vec<&WildFlyImage> {
-        self.images.range(from..=to).map(|(_, v)| v).collect()
+        self.wildfly_images
+            .range(from..=to)
+            .map(|(_, v)| v)
+            .collect()
     }
 
     /// Returns all images in version order.
     pub fn all(&self) -> Vec<&WildFlyImage> {
-        self.images.values().collect()
+        self.wildfly_images.values().collect()
     }
 
     /// Returns the number of images in the registry.
     pub fn len(&self) -> usize {
-        self.images.len()
+        self.wildfly_images.len()
     }
 
     /// Returns `true` if the registry contains no images.
     pub fn is_empty(&self) -> bool {
-        self.images.is_empty()
+        self.wildfly_images.is_empty()
     }
 
     /// Returns an iterator over the image identifiers in ascending order.
     pub fn keys(&self) -> impl Iterator<Item = &u16> {
-        self.images.keys()
+        self.wildfly_images.keys()
     }
 
     /// Reads and returns the `config_version` from the given TOML file without loading the full registry.
@@ -260,7 +263,7 @@ mod tests {
 
     #[test]
     fn load_from_path() {
-        let tmp = std::env::temp_dir().join("wildfly-meta-test-img-load");
+        let tmp = std::env::temp_dir().join("wildfly-meta-test-wildfly-image-load");
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
         let path = tmp.join("wildfly-images.toml");
@@ -281,7 +284,7 @@ mod tests {
 
     #[test]
     fn config_version_from_file() {
-        let tmp = std::env::temp_dir().join("wildfly-meta-test-img-cv");
+        let tmp = std::env::temp_dir().join("wildfly-meta-test-wildfly-image-cv");
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
         let path = tmp.join("wildfly-images.toml");
@@ -305,9 +308,9 @@ mod tests {
     #[test]
     fn get_by_identifier() {
         let reg = test_registry();
-        let img = reg.get(261).unwrap();
-        assert_eq!(img.short_version, "26.1");
-        assert_eq!(img.suffix, "Final-jdk17");
+        let wildfly_image = reg.get(261).unwrap();
+        assert_eq!(wildfly_image.short_version, "26.1");
+        assert_eq!(wildfly_image.suffix, "Final-jdk17");
     }
 
     #[test]
@@ -336,7 +339,7 @@ mod tests {
     fn first_and_last_on_empty() {
         let toml = r#"
 config_version = 1
-images = []
+wildfly_images = []
 "#;
         let reg = WildFlyImageRegistry::from_toml(toml).unwrap();
         assert!(reg.first().is_none());
@@ -346,15 +349,15 @@ images = []
     #[test]
     fn range_query() {
         let reg = test_registry();
-        let images = reg.range(200, 220);
-        assert_eq!(images.len(), 3); // 20.0, 21.0, 22.0
+        let wildfly_images = reg.range(200, 220);
+        assert_eq!(wildfly_images.len(), 3); // 20.0, 21.0, 22.0
     }
 
     #[test]
     fn range_empty_result() {
         let reg = test_registry();
-        let images = reg.range(500, 600);
-        assert!(images.is_empty());
+        let wildfly_images = reg.range(500, 600);
+        assert!(wildfly_images.is_empty());
     }
 
     #[test]
@@ -382,7 +385,7 @@ images = []
     fn is_empty_true() {
         let toml = r#"
 config_version = 1
-images = []
+wildfly_images = []
 "#;
         let reg = WildFlyImageRegistry::from_toml(toml).unwrap();
         assert!(reg.is_empty());
@@ -427,10 +430,10 @@ images = []
     #[test]
     fn short_name_regular() {
         let reg = test_registry();
-        let img = reg.get(250).unwrap();
-        assert_eq!(img.short_name(), "25.0");
-        let img = reg.get(261).unwrap();
-        assert_eq!(img.short_name(), "26.1");
+        let wildfly_image = reg.get(250).unwrap();
+        assert_eq!(wildfly_image.short_name(), "25.0");
+        let wildfly_image = reg.get(261).unwrap();
+        assert_eq!(wildfly_image.short_name(), "26.1");
     }
 
     #[test]
@@ -442,10 +445,10 @@ images = []
     #[test]
     fn full_name_regular() {
         let reg = test_registry();
-        let img = reg.get(250).unwrap();
-        assert_eq!(img.full_name(), "WildFly 25.0");
-        let img = reg.get(261).unwrap();
-        assert_eq!(img.full_name(), "WildFly 26.1");
+        let wildfly_image = reg.get(250).unwrap();
+        assert_eq!(wildfly_image.full_name(), "WildFly 25.0");
+        let wildfly_image = reg.get(261).unwrap();
+        assert_eq!(wildfly_image.full_name(), "WildFly 26.1");
     }
 
     #[test]
@@ -457,8 +460,10 @@ images = []
     #[test]
     fn image_ref_regular() {
         let reg = test_registry();
-        let img = reg.get(390).unwrap();
-        assert!(img.image_ref().starts_with("quay.io/wildfly/wildfly:"));
+        let wildfly_image = reg.get(390).unwrap();
+        assert!(wildfly_image
+            .image_ref()
+            .starts_with("quay.io/wildfly/wildfly:"));
     }
 
     #[test]
@@ -470,23 +475,23 @@ images = []
     #[test]
     fn image_ref_includes_suffix() {
         let reg = test_registry();
-        let img = reg.get(261).unwrap();
-        let name = img.image_ref();
+        let wildfly_image = reg.get(261).unwrap();
+        let name = wildfly_image.image_ref();
         assert!(name.contains("Final-jdk17"));
     }
 
     #[test]
     fn http_port() {
         let reg = test_registry();
-        let img = reg.get(340).unwrap();
-        assert_eq!(img.http_port(), 8340);
+        let wildfly_image = reg.get(340).unwrap();
+        assert_eq!(wildfly_image.http_port(), 8340);
     }
 
     #[test]
     fn management_port() {
         let reg = test_registry();
-        let img = reg.get(340).unwrap();
-        assert_eq!(img.management_port(), 9340);
+        let wildfly_image = reg.get(340).unwrap();
+        assert_eq!(wildfly_image.management_port(), 9340);
     }
 
     #[test]

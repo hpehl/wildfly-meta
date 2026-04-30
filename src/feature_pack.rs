@@ -93,7 +93,7 @@ pub(crate) struct VersionEntry {
 /// Feature packs are stored in a [`BTreeMap`] keyed by `(shortcut, version)`, so iteration
 /// is alphabetical by shortcut and then by version within each shortcut group.
 pub struct FeaturePackRegistry {
-    packs: BTreeMap<(String, String), FeaturePack>,
+    feature_packs: BTreeMap<(String, String), FeaturePack>,
 }
 
 impl FeaturePackRegistry {
@@ -111,7 +111,7 @@ impl FeaturePackRegistry {
     /// Parses the feature pack registry from a TOML string.
     pub fn from_toml(content: &str) -> Result<Self> {
         let config: FeaturePacksConfig = toml::from_str(content)?;
-        let mut packs = BTreeMap::new();
+        let mut feature_packs = BTreeMap::new();
         let mut shortcut_indices: BTreeMap<String, u16> = BTreeMap::new();
         let mut version_counts: BTreeMap<String, u16> = BTreeMap::new();
         let mut next_shortcut_index: u16 = 0;
@@ -132,7 +132,7 @@ impl FeaturePackRegistry {
                 let vi = *version_index;
                 *version_index += 1;
 
-                let fp = FeaturePack {
+                let feature_pack = FeaturePack {
                     shortcut: entry.shortcut.clone(),
                     name: entry.name.clone(),
                     group_id: entry.group_id.clone(),
@@ -142,41 +142,42 @@ impl FeaturePackRegistry {
                     version: ve.version.clone(),
                     maven_version: ve.maven_version,
                 };
-                packs.insert((entry.shortcut.clone(), ve.version), fp);
+                feature_packs.insert((entry.shortcut.clone(), ve.version), feature_pack);
             }
         }
-        Ok(Self { packs })
+        Ok(Self { feature_packs })
     }
 
     /// Returns an iterator over `(shortcut, version)` keys in sorted order.
     pub fn keys(&self) -> impl Iterator<Item = &(String, String)> {
-        self.packs.keys()
+        self.feature_packs.keys()
     }
 
     /// Returns the feature pack matching the given shortcut and version, or `None`.
     pub fn get(&self, shortcut: &str, version: &str) -> Option<&FeaturePack> {
-        self.packs.get(&(shortcut.to_string(), version.to_string()))
+        self.feature_packs
+            .get(&(shortcut.to_string(), version.to_string()))
     }
 
     /// Returns the latest (last registered) version of the given shortcut, or `None`.
     pub fn latest(&self, shortcut: &str) -> Option<&FeaturePack> {
-        self.packs
+        self.feature_packs
             .iter()
             .filter(|((s, _), _)| s == shortcut)
-            .map(|(_, fp)| fp)
+            .map(|(_, feature_pack)| feature_pack)
             .next_back()
     }
 
     /// Returns the deduplicated list of known shortcut names in alphabetical order.
     pub fn known_shortcuts(&self) -> Vec<&str> {
-        let mut shortcuts: Vec<&str> = self.packs.keys().map(|(s, _)| s.as_str()).collect();
+        let mut shortcuts: Vec<&str> = self.feature_packs.keys().map(|(s, _)| s.as_str()).collect();
         shortcuts.dedup();
         shortcuts
     }
 
     /// Returns all known version strings for the given shortcut.
     pub fn known_versions(&self, shortcut: &str) -> Vec<&str> {
-        self.packs
+        self.feature_packs
             .keys()
             .filter(|(s, _)| s == shortcut)
             .map(|(_, v)| v.as_str())
@@ -185,7 +186,7 @@ impl FeaturePackRegistry {
 
     /// Returns all feature packs in sorted order.
     pub fn all(&self) -> Vec<&FeaturePack> {
-        self.packs.values().collect()
+        self.feature_packs.values().collect()
     }
 
     /// Returns all identifiers: bare shortcuts (e.g. `"ai"`) and versioned forms (e.g. `"ai:0.9.0"`).
@@ -195,7 +196,7 @@ impl FeaturePackRegistry {
             .iter()
             .map(|s| s.to_string())
             .collect();
-        for (shortcut, version) in self.packs.keys() {
+        for (shortcut, version) in self.feature_packs.keys() {
             ids.push(format!("{}:{}", shortcut, version));
         }
         ids
@@ -203,12 +204,12 @@ impl FeaturePackRegistry {
 
     /// Returns the number of feature packs in the registry.
     pub fn len(&self) -> usize {
-        self.packs.len()
+        self.feature_packs.len()
     }
 
     /// Returns `true` if the registry contains no feature packs.
     pub fn is_empty(&self) -> bool {
-        self.packs.is_empty()
+        self.feature_packs.is_empty()
     }
 
     /// Reads and returns the `config_version` from the given TOML file without loading the full registry.
@@ -284,9 +285,9 @@ mod tests {
     fn get_by_shortcut_version() {
         let reg = test_registry();
         let latest = reg.latest("ai").unwrap();
-        let fp = reg.get("ai", &latest.version).unwrap();
-        assert_eq!(fp.shortcut, "ai");
-        assert_eq!(fp.version, latest.version);
+        let feature_pack = reg.get("ai", &latest.version).unwrap();
+        assert_eq!(feature_pack.shortcut, "ai");
+        assert_eq!(feature_pack.version, latest.version);
     }
 
     #[test]
@@ -300,9 +301,9 @@ mod tests {
         let reg = test_registry();
         let shortcuts = reg.known_shortcuts();
         for shortcut in &shortcuts {
-            let fp = reg.latest(shortcut).unwrap();
-            assert!(!fp.version.is_empty());
-            assert_eq!(fp.shortcut, *shortcut);
+            let feature_pack = reg.latest(shortcut).unwrap();
+            assert!(!feature_pack.version.is_empty());
+            assert_eq!(feature_pack.shortcut, *shortcut);
         }
     }
 
@@ -445,7 +446,11 @@ versions = [
     #[test]
     fn unique_port_offsets() {
         let reg = test_registry();
-        let mut offsets: Vec<u16> = reg.all().iter().map(|fp| fp.port_offset()).collect();
+        let mut offsets: Vec<u16> = reg
+            .all()
+            .iter()
+            .map(|feature_pack| feature_pack.port_offset())
+            .collect();
         let len = offsets.len();
         offsets.sort();
         offsets.dedup();
@@ -455,8 +460,8 @@ versions = [
     #[test]
     fn port_offsets_start_at_10000() {
         let reg = test_registry();
-        for fp in reg.all() {
-            assert!(fp.port_offset() >= 10_000);
+        for feature_pack in reg.all() {
+            assert!(feature_pack.port_offset() >= 10_000);
         }
     }
 
@@ -473,9 +478,9 @@ versions = [
     #[test]
     fn download_url_without_final() {
         let reg = test_registry();
-        let fp = reg.get("ai", "0.9.0").unwrap();
+        let feature_pack = reg.get("ai", "0.9.0").unwrap();
         assert_eq!(
-            fp.download_url(),
+            feature_pack.download_url(),
             "https://repo1.maven.org/maven2/org/wildfly/generative-ai/wildfly-ai-feature-pack/0.9.0/wildfly-ai-feature-pack-0.9.0-doc.zip"
         );
     }
@@ -483,9 +488,9 @@ versions = [
     #[test]
     fn download_url_with_final() {
         let reg = test_registry();
-        let fp = reg.get("graphql", "2.7.0").unwrap();
+        let feature_pack = reg.get("graphql", "2.7.0").unwrap();
         assert_eq!(
-            fp.download_url(),
+            feature_pack.download_url(),
             "https://repo1.maven.org/maven2/org/wildfly/extras/graphql/wildfly-microprofile-graphql-feature-pack/2.7.0.Final/wildfly-microprofile-graphql-feature-pack-2.7.0.Final-doc.zip"
         );
     }
