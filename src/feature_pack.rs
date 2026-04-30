@@ -132,10 +132,7 @@ impl FeaturePackRegistry {
             if resolution_hint.is_empty() {
                 anyhow::anyhow!("Failed to parse {}: {e}", path.display())
             } else {
-                anyhow::anyhow!(
-                    "Failed to parse {}: {e}. {resolution_hint}",
-                    path.display()
-                )
+                anyhow::anyhow!("Failed to parse {}: {e}. {resolution_hint}", path.display())
             }
         })
     }
