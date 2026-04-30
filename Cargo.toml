@@ -1,6 +1,6 @@
 [package]
 name = "wildfly_meta"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["Harald Pehl <harald.pehl@gmail.com>"]
 edition = "2021"
 description = "A library for WildFly metadata: container images, feature packs, and version expression parsing"
