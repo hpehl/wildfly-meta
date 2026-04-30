@@ -55,7 +55,7 @@ pub enum UpdateStatus {
 
 impl UpdateStatus {
     /// Returns a human-readable summary line for the given label (e.g. `"WildFly images"`).
-    fn summary(&self, label: &str) -> String {
+    pub fn summary(&self, label: &str) -> String {
         match self {
             UpdateStatus::Downloaded { version, count } => {
                 format!("{label} downloaded ({count} entries, version {version})")

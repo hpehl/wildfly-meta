@@ -9,7 +9,7 @@ use anyhow::Result;
 use semver::Version;
 use serde::Deserialize;
 
-use crate::update::wildfly_images_path;
+use crate::update::{update_wildfly_images, wildfly_images_path};
 
 /// The version string used to refer to the WildFly development build (e.g. `"dev"`).
 pub static DEVELOPMENT_VERSION: &str = "dev";
@@ -153,6 +153,25 @@ impl WildFlyImageRegistry {
     /// (e.g. `"Run 'wado update' to fix this."`).
     pub fn load_default(resolution_hint: &str) -> Result<Self> {
         Self::load(&wildfly_images_path(), resolution_hint)
+    }
+
+    /// Loads the image registry, automatically downloading the configuration if it is missing
+    /// or corrupt.
+    ///
+    /// If the configuration file does not exist, it is downloaded first. If loading fails
+    /// (e.g. the file is corrupt or uses a deprecated format), the file is re-downloaded
+    /// and loading is retried once.
+    ///
+    /// The `resolution_hint` is appended to error messages if the retry also fails.
+    pub fn load_or_update(resolution_hint: &str) -> Result<Self> {
+        let path = wildfly_images_path();
+        if !path.exists() {
+            update_wildfly_images()?;
+        }
+        Self::load_default(resolution_hint).or_else(|_| {
+            update_wildfly_images()?;
+            Self::load_default(resolution_hint)
+        })
     }
 
     /// Loads the image registry from the given TOML file path.
@@ -358,6 +377,24 @@ mod tests {
     fn config_version_missing_file() {
         let path = Path::new("/nonexistent/wildfly-images.toml");
         assert!(WildFlyImageRegistry::config_version(path).is_err());
+    }
+
+    // ------------------------------------------------------ load_or_update
+
+    #[test]
+    #[ignore] // requires network access
+    fn load_or_update_succeeds() {
+        let reg = WildFlyImageRegistry::load_or_update("");
+        assert!(reg.is_ok());
+        assert!(!reg.unwrap().is_empty());
+    }
+
+    #[test]
+    #[ignore] // requires network access
+    fn load_or_update_includes_resolution_hint_on_failure() {
+        let hint = "Run 'mytool update' to fix this.";
+        let reg = WildFlyImageRegistry::load_or_update(hint);
+        assert!(reg.is_ok());
     }
 
     // ------------------------------------------------------ registry queries

@@ -8,7 +8,7 @@ use anyhow::Result;
 use semver::Version;
 use serde::Deserialize;
 
-use crate::update::feature_packs_path;
+use crate::update::{feature_packs_path, update_feature_packs};
 
 const FEATURE_PACK_PORT_OFFSET_BASE: u16 = 10_000;
 // Max versions per shortcut before colliding with the next shortcut's port range
@@ -114,6 +114,25 @@ impl FeaturePackRegistry {
     /// (e.g. `"Run 'wado update' to fix this."`).
     pub fn load_default(resolution_hint: &str) -> Result<Self> {
         Self::load(&feature_packs_path(), resolution_hint)
+    }
+
+    /// Loads the feature pack registry, automatically downloading the configuration if it is
+    /// missing or corrupt.
+    ///
+    /// If the configuration file does not exist, it is downloaded first. If loading fails
+    /// (e.g. the file is corrupt or uses a deprecated format), the file is re-downloaded
+    /// and loading is retried once.
+    ///
+    /// The `resolution_hint` is appended to error messages if the retry also fails.
+    pub fn load_or_update(resolution_hint: &str) -> Result<Self> {
+        let path = feature_packs_path();
+        if !path.exists() {
+            update_feature_packs()?;
+        }
+        Self::load_default(resolution_hint).or_else(|_| {
+            update_feature_packs()?;
+            Self::load_default(resolution_hint)
+        })
     }
 
     /// Loads the feature pack registry from the given TOML file path.
@@ -346,6 +365,16 @@ mod tests {
     fn config_version_missing_file() {
         let path = Path::new("/nonexistent/feature-packs.toml");
         assert!(FeaturePackRegistry::config_version(path).is_err());
+    }
+
+    // ------------------------------------------------------ load_or_update
+
+    #[test]
+    #[ignore] // requires network access
+    fn load_or_update_succeeds() {
+        let reg = FeaturePackRegistry::load_or_update("");
+        assert!(reg.is_ok());
+        assert!(!reg.unwrap().is_empty());
     }
 
     // ------------------------------------------------------ registry queries

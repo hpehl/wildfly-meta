@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `WildFlyImageRegistry::load_or_update()` and `FeaturePackRegistry::load_or_update()` convenience methods that automatically download the configuration if it is missing or corrupt, retrying once on load failure
+- `UpdateStatus::summary()` is now public, allowing consumers to generate human-readable status messages
+
 ## [0.4.0] - 2026-04-30
 
 ### Breaking Changes
