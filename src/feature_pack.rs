@@ -35,7 +35,7 @@ pub struct FeaturePack {
     pub version_index: u16,
     /// Semantic version (e.g. `0.9.0`).
     pub version: Version,
-    /// Maven version string, which may differ from the display version (e.g. `"2.7.0.Final"`).
+    /// Maven version string, which may differ from the semantic version (e.g. `"2.7.0.Final"`).
     pub maven_version: String,
 }
 
