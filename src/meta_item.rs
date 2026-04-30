@@ -1,10 +1,12 @@
 //! Parsed metadata item wrapping either a WildFly image or a feature pack.
 
+use serde::Serialize;
+
 use crate::feature_pack::FeaturePack;
 use crate::wildfly_image::WildFlyImage;
 
 /// A parsed metadata item — either a WildFly container image or a Galleon feature pack.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub enum MetaItem {
     /// A WildFly container image.
     Image(WildFlyImage),

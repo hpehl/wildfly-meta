@@ -6,7 +6,7 @@ use std::path::Path;
 
 use anyhow::Result;
 use semver::Version;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::registry;
 use crate::update::{update_wildfly_images, wildfly_images_path};
@@ -43,7 +43,7 @@ pub fn wildfly_dev() -> WildFlyImage {
 ///
 /// Images are ordered by their [`identifier`](WildFlyImage::identifier), which encodes
 /// `major * 10 + minor` (e.g. `261` for WildFly 26.1).
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone, Serialize)]
 pub struct WildFlyImage {
     /// Numeric identifier encoding `major * 10 + minor` (e.g. `340` for WildFly 34.0).
     pub identifier: u16,

@@ -5,7 +5,7 @@ use std::path::Path;
 
 use anyhow::Result;
 use semver::Version;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::registry;
 use crate::update::{feature_packs_path, update_feature_packs};
@@ -18,7 +18,7 @@ const FEATURE_PACK_PORT_OFFSET_STEP: u16 = 100;
 /// Feature packs extend WildFly with additional capabilities (e.g. AI, GraphQL, gRPC).
 /// Each feature pack has a short alias (`shortcut`) used in the version expression DSL
 /// and Maven coordinates for downloading the documentation archive.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
 pub struct FeaturePack {
     /// Short alias used in the DSL (e.g. `"ai"`, `"graphql"`).
     pub shortcut: String,

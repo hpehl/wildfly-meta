@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Derive `Serialize` on `WildFlyImage`, `FeaturePack`, and `MetaItem` for JSON serialization support
+
+### Changed
+
+- Extract tests into separate files for `wildfly_image`, `feature_pack`, and `update` modules
+
+### Removed
+
+- Remove Keycloak feature pack and GraphQL 2.5.0 version (no published doc-zip artifact)
+
 ## [0.5.0] - 2026-04-30
 
 ### Breaking Changes
