@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- `WildFlyImageRegistry::load_default()` and `WildFlyImageRegistry::load()` now require a `resolution_hint: &str` parameter
+- `FeaturePackRegistry::load_default()` and `FeaturePackRegistry::load()` now require a `resolution_hint: &str` parameter
+
+### Added
+
+- Fail-safe resolution for missing or corrupt TOML configuration files: `load()` and `load_default()` accept a `resolution_hint` that is appended to error messages, letting each consumer suggest its own recovery action (e.g. `"Run 'wado update' to fix this."`)
+- Corrupt local configuration files are now automatically replaced during update instead of causing a permanent error
+
 ## [0.3.0] - 2026-04-30
 
 ### Breaking Changes

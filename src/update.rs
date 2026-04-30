@@ -238,30 +238,36 @@ where
 
     if local_path.exists() {
         let local_content = fs::read_to_string(local_path)?;
-        let (local_version, _) = extract_version(&local_content)?;
-        if local_version >= remote_version {
-            return Ok(UpdateStatus::AlreadyUpToDate(local_version));
+        match extract_version(&local_content) {
+            Ok((local_version, _)) => {
+                if local_version >= remote_version {
+                    return Ok(UpdateStatus::AlreadyUpToDate(local_version));
+                }
+                let diff = compute_diff(&local_content, &remote_content);
+                if let Some(parent) = local_path.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                fs::write(local_path, &remote_content)?;
+                return Ok(UpdateStatus::Updated {
+                    from_version: local_version,
+                    to_version: remote_version,
+                    diff,
+                });
+            }
+            Err(_) => {
+                fs::remove_file(local_path)?;
+            }
         }
-        let diff = compute_diff(&local_content, &remote_content);
-        if let Some(parent) = local_path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(local_path, &remote_content)?;
-        Ok(UpdateStatus::Updated {
-            from_version: local_version,
-            to_version: remote_version,
-            diff,
-        })
-    } else {
-        if let Some(parent) = local_path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(local_path, &remote_content)?;
-        Ok(UpdateStatus::Downloaded {
-            version: remote_version,
-            count: remote_count,
-        })
     }
+
+    if let Some(parent) = local_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(local_path, &remote_content)?;
+    Ok(UpdateStatus::Downloaded {
+        version: remote_version,
+        count: remote_count,
+    })
 }
 
 // ------------------------------------------------------ tests

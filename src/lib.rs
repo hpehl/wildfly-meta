@@ -17,8 +17,8 @@
 //! println!("{}", result.summary());
 //!
 //! // Load registries
-//! let wildfly_images = WildFlyImageRegistry::load_default().expect("failed to load images");
-//! let feature_packs = FeaturePackRegistry::load_default().expect("failed to load feature packs");
+//! let wildfly_images = WildFlyImageRegistry::load_default("").expect("failed to load images");
+//! let feature_packs = FeaturePackRegistry::load_default("").expect("failed to load feature packs");
 //!
 //! // Parse a version expression
 //! let items = parse_meta_items("34,dev,ai", &wildfly_images, &feature_packs, &ParseOptions::all(), &ParseOptions::all()).unwrap();

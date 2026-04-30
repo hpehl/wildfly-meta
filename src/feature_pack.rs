@@ -106,15 +106,38 @@ pub struct FeaturePackRegistry {
 }
 
 impl FeaturePackRegistry {
-    /// Loads the feature pack registry from the default configuration path (`~/.config/wildfly-meta/feature-packs.toml`).
-    pub fn load_default() -> Result<Self> {
-        Self::load(&feature_packs_path())
+    /// Loads the feature pack registry from the default configuration path
+    /// (`~/.config/wildfly-meta/feature-packs.toml`).
+    ///
+    /// The `resolution_hint` is appended to error messages when the file is missing or
+    /// unparsable, letting each consumer suggest their own recovery action
+    /// (e.g. `"Run 'wado update' to fix this."`).
+    pub fn load_default(resolution_hint: &str) -> Result<Self> {
+        Self::load(&feature_packs_path(), resolution_hint)
     }
 
     /// Loads the feature pack registry from the given TOML file path.
-    pub fn load(path: &Path) -> Result<Self> {
-        let content = fs::read_to_string(path)?;
-        Self::from_toml(&content)
+    ///
+    /// The `resolution_hint` is appended to error messages when the file is missing or
+    /// unparsable, letting each consumer suggest their own recovery action.
+    pub fn load(path: &Path, resolution_hint: &str) -> Result<Self> {
+        let content = fs::read_to_string(path).map_err(|e| {
+            if resolution_hint.is_empty() {
+                anyhow::anyhow!("{e}")
+            } else {
+                anyhow::anyhow!("{e}. {resolution_hint}")
+            }
+        })?;
+        Self::from_toml(&content).map_err(|e| {
+            if resolution_hint.is_empty() {
+                anyhow::anyhow!("Failed to parse {}: {e}", path.display())
+            } else {
+                anyhow::anyhow!(
+                    "Failed to parse {}: {e}. {resolution_hint}",
+                    path.display()
+                )
+            }
+        })
     }
 
     /// Parses the feature pack registry from a TOML string.
@@ -258,7 +281,7 @@ mod tests {
         let content = include_str!("../feature-packs.toml");
         fs::write(&path, content).unwrap();
 
-        let reg = FeaturePackRegistry::load(&path).unwrap();
+        let reg = FeaturePackRegistry::load(&path, "").unwrap();
         assert!(!reg.is_empty());
 
         let _ = fs::remove_dir_all(&tmp);
@@ -267,7 +290,44 @@ mod tests {
     #[test]
     fn load_from_missing_path() {
         let path = Path::new("/nonexistent/feature-packs.toml");
-        assert!(FeaturePackRegistry::load(path).is_err());
+        assert!(FeaturePackRegistry::load(path, "").is_err());
+    }
+
+    #[test]
+    fn load_missing_file_includes_resolution_hint() {
+        let path = Path::new("/nonexistent/feature-packs.toml");
+        let hint = "Run 'mytool update' to fix this.";
+        let result = FeaturePackRegistry::load(path, hint);
+        assert!(result.is_err());
+        let err = format!("{}", result.err().unwrap());
+        assert!(err.contains(hint));
+    }
+
+    #[test]
+    fn load_corrupt_file_includes_resolution_hint() {
+        let tmp = std::env::temp_dir().join("wildfly-meta-test-fp-corrupt");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        let path = tmp.join("feature-packs.toml");
+        fs::write(&path, "this is not valid toml {{{}}}").unwrap();
+
+        let hint = "Run 'mytool update' to fix this.";
+        let result = FeaturePackRegistry::load(&path, hint);
+        assert!(result.is_err());
+        let err = format!("{}", result.err().unwrap());
+        assert!(err.contains(hint));
+        assert!(err.contains("Failed to parse"));
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn load_empty_resolution_hint_no_trailing_dot() {
+        let path = Path::new("/nonexistent/feature-packs.toml");
+        let result = FeaturePackRegistry::load(path, "");
+        assert!(result.is_err());
+        let err = format!("{}", result.err().unwrap());
+        assert!(!err.ends_with(". "));
     }
 
     #[test]
