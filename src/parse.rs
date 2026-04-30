@@ -506,7 +506,7 @@ mod tests {
         let reg = fp_registry();
         let fp = parse_feature_pack("ai", &reg).unwrap();
         assert_eq!(fp.shortcut, "ai");
-        assert_eq!(fp.version, "0.9.0");
+        assert_eq!(fp.version, "0.9.1");
     }
 
     #[test]
@@ -1034,7 +1034,7 @@ mod tests {
         let fps = fp_registry();
         let fp = parse_feature_pack("ai", &fps).unwrap();
         let item = MetaItem::FeaturePack(fp);
-        assert_eq!(item.short_name(), "ai 0.9.0");
+        assert_eq!(item.short_name(), "ai 0.9.1");
     }
 
     #[test]
@@ -1065,7 +1065,7 @@ mod tests {
         let wf = parse_meta_item("34", &imgs, &fps).unwrap();
         assert_eq!(wf.full_name(), "WildFly 34.0");
         let fp = parse_meta_item("ai", &imgs, &fps).unwrap();
-        assert_eq!(fp.full_name(), "AI Feature Pack 0.9.0");
+        assert_eq!(fp.full_name(), "AI Feature Pack 0.9.1");
     }
 
     #[test]
@@ -1075,7 +1075,7 @@ mod tests {
         let wf = parse_meta_item("34", &imgs, &fps).unwrap();
         assert_eq!(wf.container_name(), "340");
         let fp = parse_meta_item("ai", &imgs, &fps).unwrap();
-        assert_eq!(fp.container_name(), "ai-0-9-0");
+        assert_eq!(fp.container_name(), "ai-0-9-1");
     }
 
     #[test]

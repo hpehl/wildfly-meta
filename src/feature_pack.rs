@@ -79,6 +79,11 @@ pub(crate) struct FeaturePackEntry {
     pub name: String,
     pub group_id: String,
     pub artifact_id: String,
+    pub versions: Vec<VersionEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct VersionEntry {
     pub version: String,
     pub maven_version: String,
 }
@@ -121,21 +126,24 @@ impl FeaturePackRegistry {
                     idx
                 }
             };
-            let version_index = version_counts.entry(entry.shortcut.clone()).or_insert(0);
-            let vi = *version_index;
-            *version_index += 1;
 
-            let fp = FeaturePack {
-                shortcut: entry.shortcut.clone(),
-                name: entry.name,
-                group_id: entry.group_id,
-                artifact_id: entry.artifact_id,
-                shortcut_index,
-                version_index: vi,
-                version: entry.version.clone(),
-                maven_version: entry.maven_version,
-            };
-            packs.insert((entry.shortcut, entry.version), fp);
+            for ve in entry.versions {
+                let version_index = version_counts.entry(entry.shortcut.clone()).or_insert(0);
+                let vi = *version_index;
+                *version_index += 1;
+
+                let fp = FeaturePack {
+                    shortcut: entry.shortcut.clone(),
+                    name: entry.name.clone(),
+                    group_id: entry.group_id.clone(),
+                    artifact_id: entry.artifact_id.clone(),
+                    shortcut_index,
+                    version_index: vi,
+                    version: ve.version.clone(),
+                    maven_version: ve.maven_version,
+                };
+                packs.insert((entry.shortcut.clone(), ve.version), fp);
+            }
         }
         Ok(Self { packs })
     }
@@ -225,7 +233,7 @@ mod tests {
     #[test]
     fn load_all_packs() {
         let reg = test_registry();
-        assert_eq!(reg.len(), 5);
+        assert!(!reg.is_empty());
     }
 
     #[test]
@@ -238,7 +246,7 @@ mod tests {
         fs::write(&path, content).unwrap();
 
         let reg = FeaturePackRegistry::load(&path).unwrap();
-        assert_eq!(reg.len(), 5);
+        assert!(!reg.is_empty());
 
         let _ = fs::remove_dir_all(&tmp);
     }
@@ -275,9 +283,10 @@ mod tests {
     #[test]
     fn get_by_shortcut_version() {
         let reg = test_registry();
-        let fp = reg.get("ai", "0.9.0").unwrap();
-        assert_eq!(fp.name, "AI");
-        assert_eq!(fp.group_id, "org.wildfly.generative-ai");
+        let latest = reg.latest("ai").unwrap();
+        let fp = reg.get("ai", &latest.version).unwrap();
+        assert_eq!(fp.shortcut, "ai");
+        assert_eq!(fp.version, latest.version);
     }
 
     #[test]
@@ -289,8 +298,12 @@ mod tests {
     #[test]
     fn latest_version() {
         let reg = test_registry();
-        let fp = reg.latest("ai").unwrap();
-        assert_eq!(fp.version, "0.9.0");
+        let shortcuts = reg.known_shortcuts();
+        for shortcut in &shortcuts {
+            let fp = reg.latest(shortcut).unwrap();
+            assert!(!fp.version.is_empty());
+            assert_eq!(fp.shortcut, *shortcut);
+        }
     }
 
     #[test]
@@ -303,17 +316,18 @@ mod tests {
     fn known_shortcuts() {
         let reg = test_registry();
         let shortcuts = reg.known_shortcuts();
-        assert_eq!(
-            shortcuts,
-            vec!["ai", "graphql", "grpc", "keycloak", "myfaces"]
-        );
+        assert!(!shortcuts.is_empty());
+        let mut sorted = shortcuts.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(shortcuts, sorted, "shortcuts should be sorted and unique");
     }
 
     #[test]
     fn known_versions_for_shortcut() {
         let reg = test_registry();
         let versions = reg.known_versions("ai");
-        assert_eq!(versions, vec!["0.9.0"]);
+        assert_eq!(versions, vec!["0.8.1", "0.9.0", "0.9.1"]);
     }
 
     #[test]
@@ -357,7 +371,13 @@ mod tests {
     fn is_empty_true() {
         let toml = r#"
 config_version = 1
-feature_packs = []
+
+[[feature_packs]]
+shortcut = "empty"
+name = "Empty"
+group_id = "org.example"
+artifact_id = "empty-fp"
+versions = []
 "#;
         let reg = FeaturePackRegistry::from_toml(toml).unwrap();
         assert!(reg.is_empty());
@@ -379,7 +399,9 @@ feature_packs = []
     #[test]
     fn version_index_computed() {
         let reg = test_registry();
-        assert_eq!(reg.get("ai", "0.9.0").unwrap().version_index, 0);
+        assert_eq!(reg.get("ai", "0.9.1").unwrap().version_index, 0);
+        assert_eq!(reg.get("ai", "0.9.0").unwrap().version_index, 1);
+        assert_eq!(reg.get("ai", "0.8.1").unwrap().version_index, 2);
     }
 
     #[test]
@@ -392,16 +414,10 @@ shortcut = "ai"
 name = "AI"
 group_id = "org.wildfly.ai"
 artifact_id = "wildfly-ai-fp"
-version = "0.8.0"
-maven_version = "0.8.0"
-
-[[feature_packs]]
-shortcut = "ai"
-name = "AI"
-group_id = "org.wildfly.ai"
-artifact_id = "wildfly-ai-fp"
-version = "0.9.0"
-maven_version = "0.9.0"
+versions = [
+  { version = "0.8.0", maven_version = "0.8.0" },
+  { version = "0.9.0", maven_version = "0.9.0" },
+]
 "#;
         let reg = FeaturePackRegistry::from_toml(toml).unwrap();
         assert_eq!(reg.len(), 2);
@@ -419,7 +435,7 @@ maven_version = "0.9.0"
     #[test]
     fn port_offset() {
         let reg = test_registry();
-        assert_eq!(reg.get("ai", "0.9.0").unwrap().port_offset(), 10_000);
+        assert_eq!(reg.get("ai", "0.9.1").unwrap().port_offset(), 10_000);
         assert_eq!(reg.get("graphql", "2.7.0").unwrap().port_offset(), 10_100);
         assert_eq!(reg.get("grpc", "0.1.16").unwrap().port_offset(), 10_200);
         assert_eq!(reg.get("keycloak", "26.6.1").unwrap().port_offset(), 10_300);

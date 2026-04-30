@@ -443,16 +443,18 @@ shortcut = "ai"
 name = "AI"
 group_id = "org.wildfly.ai"
 artifact_id = "wildfly-ai-feature-pack"
-version = "0.9.0"
-maven_version = "0.9.0"
+versions = [
+  { version = "0.9.0", maven_version = "0.9.0" },
+]
 
 [[feature_packs]]
 shortcut = "graphql"
 name = "GraphQL"
 group_id = "org.wildfly.extras.graphql"
 artifact_id = "wildfly-graphql-feature-pack"
-version = "2.3.0"
-maven_version = "2.3.0.Final"
+versions = [
+  { version = "2.3.0", maven_version = "2.3.0.Final" },
+]
 "#;
 
         let new_toml = r#"
@@ -463,16 +465,10 @@ shortcut = "ai"
 name = "AI"
 group_id = "org.wildfly.ai"
 artifact_id = "wildfly-ai-feature-pack"
-version = "0.9.0"
-maven_version = "0.9.0"
-
-[[feature_packs]]
-shortcut = "ai"
-name = "AI"
-group_id = "org.wildfly.ai"
-artifact_id = "wildfly-ai-feature-pack"
-version = "1.0.0"
-maven_version = "1.0.0"
+versions = [
+  { version = "0.9.0", maven_version = "0.9.0" },
+  { version = "1.0.0", maven_version = "1.0.0" },
+]
 "#;
 
         let old_reg = FeaturePackRegistry::from_toml(old_toml).unwrap();
