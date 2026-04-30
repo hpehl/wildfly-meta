@@ -38,7 +38,7 @@ fn main() -> Result<()> {
 }
 ```
 
-## Container Images
+## WildFly Images
 
 Container images represent WildFly versions deployed at [Docker Hub](https://hub.docker.com/r/jboss/wildfly) and [Quay.io](https://quay.io/repository/wildfly/wildfly).
 
@@ -296,41 +296,3 @@ maven_version = "0.9.0"
 ```
 
 To add a new feature pack, append a `[[feature_packs]]` entry and increment `config_version`. `shortcut_index` and `version_index` are computed at load time from TOML order.
-
-## Supported Versions
-
-| Short Version | WildFly Version | Image / Tag                                  | Platforms                                            |
-|---------------|-----------------|----------------------------------------------|------------------------------------------------------|
-| 10            | 10.0.0.Final    | docker.io/jboss/wildfly:10.0.0.Final         |                                                      |
-| 10.1          | 10.1.0.Final    | docker.io/jboss/wildfly:10.1.0.Final         |                                                      |
-| 11            | 11.0.0.Final    | docker.io/jboss/wildfly:11.0.0.Final         |                                                      |
-| 12            | 12.0.0.Final    | docker.io/jboss/wildfly:12.0.0.Final         |                                                      |
-| 13            | 13.0.0.Final    | docker.io/jboss/wildfly:13.0.0.Final         |                                                      |
-| 14            | 14.0.1.Final    | docker.io/jboss/wildfly:14.0.1.Final         |                                                      |
-| 15            | 15.0.1.Final    | docker.io/jboss/wildfly:15.0.1.Final         |                                                      |
-| 16            | 16.0.0.Final    | docker.io/jboss/wildfly:16.0.0.Final         |                                                      |
-| 17            | 17.0.1.Final    | docker.io/jboss/wildfly:17.0.1.Final         |                                                      |
-| 18            | 18.0.1.Final    | docker.io/jboss/wildfly:18.0.1.Final         |                                                      |
-| 19            | 19.0.0.Final    | docker.io/jboss/wildfly:19.0.0.Final         |                                                      |
-| 19.1          | 19.1.0.Final    | docker.io/jboss/wildfly:19.1.0.Final         |                                                      |
-| 20            | 20.0.1.Final    | docker.io/jboss/wildfly:20.0.1.Final         |                                                      |
-| 21            | 21.0.2.Final    | docker.io/jboss/wildfly:21.0.2.Final         |                                                      |
-| 22            | 22.0.1.Final    | docker.io/jboss/wildfly:22.0.1.Final         |                                                      |
-| 23            | 23.0.2.Final    | quay.io/wildfly/wildfly:23.0.2.Final         |                                                      |
-| 24            | 24.0.1.Final    | quay.io/wildfly/wildfly:24.0.1.Final         |                                                      |
-| 25            | 25.0.1.Final    | quay.io/wildfly/wildfly:25.0.1.Final         |                                                      |
-| 26            | 26.0.1.Final    | quay.io/wildfly/wildfly:26.0.1.Final         |                                                      |
-| 26.1          | 26.1.3.Final    | quay.io/wildfly/wildfly:26.1.3.Final-jdk17   | linux/amd64, linux/arm64                             |
-| 27            | 27.0.1.Final    | quay.io/wildfly/wildfly:27.0.1.Final-jdk19   | linux/amd64, linux/arm64                             |
-| 28            | 28.0.1.Final    | quay.io/wildfly/wildfly:28.0.1.Final-jdk20   | linux/amd64, linux/arm64                             |
-| 29            | 29.0.1.Final    | quay.io/wildfly/wildfly:29.0.1.Final-jdk20   | linux/amd64, linux/arm64                             |
-| 30            | 30.0.1.Final    | quay.io/wildfly/wildfly:30.0.1.Final-jdk20   | linux/amd64, linux/arm64                             |
-| 31            | 31.0.1.Final    | quay.io/wildfly/wildfly:31.0.1.Final-jdk20   | linux/amd64, linux/arm64                             |
-| 32            | 32.0.1.Final    | quay.io/wildfly/wildfly:32.0.1.Final-jdk21   | linux/amd64, linux/arm64, linux/s390x                |
-| 33            | 33.0.2.Final    | quay.io/wildfly/wildfly:33.0.2.Final-jdk21   | linux/amd64, linux/arm64, linux/s390x, linux/ppc64le |
-| 34            | 34.0.1.Final    | quay.io/wildfly/wildfly:34.0.1.Final-jdk21   | linux/amd64, linux/arm64, linux/s390x, linux/ppc64le |
-| 35            | 35.0.1.Final    | quay.io/wildfly/wildfly:35.0.1.Final-jdk21   | linux/amd64, linux/arm64, linux/s390x, linux/ppc64le |
-| 36            | 36.0.1.Final    | quay.io/wildfly/wildfly:36.0.1.Final-jdk21   | linux/amd64, linux/arm64, linux/s390x, linux/ppc64le |
-| 37            | 37.0.1.Final    | quay.io/wildfly/wildfly:37.0.1.Final-jdk21   | linux/amd64, linux/arm64, linux/s390x, linux/ppc64le |
-| 38            | 38.0.1.Final    | quay.io/wildfly/wildfly:38.0.1.Final-jdk21   | linux/amd64, linux/arm64, linux/s390x, linux/ppc64le |
-| 39            | 39.0.1.Final    | quay.io/wildfly/wildfly:39.0.1.Final-2-jdk21 | linux/amd64, linux/arm64, linux/s390x, linux/ppc64le |
