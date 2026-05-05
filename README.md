@@ -2,7 +2,7 @@
 
 A Rust library for managing WildFly metadata: container images, feature packs, and version expression parsing.
 
-Data is loaded from TOML configuration files stored in `~/.config/wildfly-meta/` and downloaded on demand from GitHub. The library is consumed by Rust-based CLI tools such as [wado](https://github.com/hpehl/wado) and [mgt](https://github.com/hpehl/wildfly-model-graph).
+Data is loaded from TOML configuration files stored in `~/.config/wildfly-meta/` and downloaded on demand from GitHub. The library is consumed by Rust-based CLI tools such as [wado](https://github.com/hpehl/wado) and [mgt](https://github.com/model-graph-tools/tooling).
 
 ## Quick Start
 
