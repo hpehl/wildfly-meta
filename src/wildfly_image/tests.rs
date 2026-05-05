@@ -120,7 +120,9 @@ fn get_by_identifier() {
     let reg = test_registry();
     let wildfly_image = reg.get(261).unwrap();
     assert_eq!(wildfly_image.short_version, "26.1");
-    assert_eq!(wildfly_image.suffix, "Final-jdk17");
+    assert_eq!(wildfly_image.release_version, "26.1.3.Final");
+    assert_eq!(wildfly_image.core_release_version, "18.1.2.Final");
+    assert_eq!(wildfly_image.image_tag, "26.1.3.Final-jdk17");
 }
 
 #[test]
@@ -224,6 +226,9 @@ fn wildfly_dev_fields() {
     assert_eq!(dev.http_port(), 8000);
     assert_eq!(dev.management_port(), 9000);
     assert!(dev.short_version.is_empty());
+    assert!(dev.release_version.is_empty());
+    assert!(dev.core_release_version.is_empty());
+    assert!(dev.image_tag.is_empty());
     assert!(dev.platforms.is_empty());
 }
 
@@ -283,11 +288,12 @@ fn image_ref_dev() {
 }
 
 #[test]
-fn image_ref_includes_suffix() {
+fn image_ref_uses_image_tag() {
     let reg = test_registry();
-    let wildfly_image = reg.get(261).unwrap();
-    let name = wildfly_image.image_ref();
-    assert!(name.contains("Final-jdk17"));
+    let img = reg.get(261).unwrap();
+    let name = img.image_ref();
+    assert!(name.contains("26.1.3.Final-jdk17"));
+    assert_eq!(name, format!("{}:{}", img.repository, img.image_tag));
 }
 
 #[test]

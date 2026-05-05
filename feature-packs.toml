@@ -1,4 +1,4 @@
-config_version = 3
+config_version = 4
 
 [[feature_packs]]
 shortcut = "ai"
@@ -6,9 +6,9 @@ name = "AI"
 group_id = "org.wildfly.generative-ai"
 artifact_id = "wildfly-ai-feature-pack"
 versions = [
-  { version = "0.9.1", maven_version = "0.9.1" },
-  { version = "0.9.0", maven_version = "0.9.0" },
-  { version = "0.8.1", maven_version = "0.8.1" },
+  { version = "0.9.1", release_version = "0.9.1" },
+  { version = "0.9.0", release_version = "0.9.0" },
+  { version = "0.8.1", release_version = "0.8.1" },
 ]
 
 [[feature_packs]]
@@ -17,8 +17,8 @@ name = "GraphQL"
 group_id = "org.wildfly.extras.graphql"
 artifact_id = "wildfly-microprofile-graphql-feature-pack"
 versions = [
-  { version = "2.7.0", maven_version = "2.7.0.Final" },
-  { version = "2.6.0", maven_version = "2.6.0.Final" },
+  { version = "2.7.0", release_version = "2.7.0.Final" },
+  { version = "2.6.0", release_version = "2.6.0.Final" },
 ]
 
 [[feature_packs]]
@@ -27,9 +27,9 @@ name = "gRPC"
 group_id = "org.wildfly.extras.grpc"
 artifact_id = "wildfly-grpc-feature-pack"
 versions = [
-  { version = "0.1.16", maven_version = "0.1.16.Final" },
-  { version = "0.1.15", maven_version = "0.1.15.Final" },
-  { version = "0.1.14", maven_version = "0.1.14.Final" },
+  { version = "0.1.16", release_version = "0.1.16.Final" },
+  { version = "0.1.15", release_version = "0.1.15.Final" },
+  { version = "0.1.14", release_version = "0.1.14.Final" },
 ]
 
 [[feature_packs]]
@@ -38,6 +38,6 @@ name = "MyFaces"
 group_id = "org.wildfly"
 artifact_id = "wildfly-myfaces-feature-pack"
 versions = [
-  { version = "2.0.3", maven_version = "2.0.3.Final" },
-  { version = "2.0.2", maven_version = "2.0.2.Final" },
+  { version = "2.0.3", release_version = "2.0.3.Final" },
+  { version = "2.0.2", release_version = "2.0.2.Final" },
 ]

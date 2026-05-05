@@ -30,7 +30,9 @@ pub fn wildfly_dev() -> WildFlyImage {
         version: Version::new(0, 0, 0),
         short_version: String::new(),
         core_version: Version::new(0, 0, 0),
-        suffix: String::new(),
+        release_version: String::new(),
+        core_release_version: String::new(),
+        image_tag: String::new(),
         repository: String::new(),
         platforms: vec![],
     }
@@ -53,8 +55,12 @@ pub struct WildFlyImage {
     pub short_version: String,
     /// WildFly Core version bundled with this release.
     pub core_version: Version,
-    /// Container image tag suffix (e.g. `"Final"` or `"Final-jdk17"`).
-    pub suffix: String,
+    /// Full WildFly release version string (e.g. `"34.0.1.Final"`).
+    pub release_version: String,
+    /// Full WildFly Core release version string (e.g. `"26.0.1.Final"`).
+    pub core_release_version: String,
+    /// Container image tag (e.g. `"34.0.1.Final-jdk21"`).
+    pub image_tag: String,
     /// Container registry and repository (e.g. `"quay.io/wildfly/wildfly"`).
     pub repository: String,
     /// Supported platform architectures (e.g. `["linux/amd64", "linux/arm64"]`).
@@ -68,7 +74,7 @@ impl WildFlyImage {
         if self.is_dev() {
             "https://github.com/wildfly/wildfly.git".to_string()
         } else {
-            format!("{}:{}.{}", self.repository, self.version, self.suffix)
+            format!("{}:{}", self.repository, self.image_tag)
         }
     }
 
@@ -130,7 +136,9 @@ pub(crate) struct WildFlyImageEntry {
     pub minor: u16,
     pub version: Version,
     pub core_version: Version,
-    pub suffix: String,
+    pub release_version: String,
+    pub core_release_version: String,
+    pub image_tag: String,
     pub repository: String,
     #[serde(default)]
     pub platforms: Vec<String>,
@@ -191,7 +199,9 @@ impl WildFlyImageRegistry {
                 short_version: format!("{}.{}", entry.major, entry.minor),
                 version: entry.version,
                 core_version: entry.core_version,
-                suffix: entry.suffix,
+                release_version: entry.release_version,
+                core_release_version: entry.core_release_version,
+                image_tag: entry.image_tag,
                 repository: entry.repository,
                 platforms: entry.platforms,
             };

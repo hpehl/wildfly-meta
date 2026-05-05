@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING**: Replaced `suffix` field on `WildFlyImage` with three explicit fields:
+  - `release_version` — full WildFly release version (e.g. `"34.0.1.Final"`)
+  - `core_release_version` — full WildFly Core release version (e.g. `"26.0.1.Final"`)
+  - `image_tag` — complete container image tag (e.g. `"34.0.1.Final-jdk21"`)
+- Updated `wildfly-images.toml` to use the new fields (bumped `config_version`)
+- `image_ref()` now uses `image_tag` directly instead of constructing from `version` + `suffix`
+- **BREAKING**: Renamed `maven_version` field on `FeaturePack` to `release_version` for consistency
+- Updated `feature-packs.toml` to use `release_version` (bumped `config_version`)
+
 ## [0.6.1] - 2026-04-30
 
 ### Fixed

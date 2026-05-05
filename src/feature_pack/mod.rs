@@ -34,8 +34,8 @@ pub struct FeaturePack {
     pub version_index: u16,
     /// Semantic version (e.g. `0.9.0`).
     pub version: Version,
-    /// Maven version string, which may differ from the semantic version (e.g. `"2.7.0.Final"`).
-    pub maven_version: String,
+    /// Release version string, which may differ from the semantic version (e.g. `"2.7.0.Final"`).
+    pub release_version: String,
 }
 
 impl FeaturePack {
@@ -60,7 +60,11 @@ impl FeaturePack {
         let group_path = self.group_id.replace('.', "/");
         format!(
             "https://repo1.maven.org/maven2/{}/{}/{}/{}-{}-doc.zip",
-            group_path, self.artifact_id, self.maven_version, self.artifact_id, self.maven_version
+            group_path,
+            self.artifact_id,
+            self.release_version,
+            self.artifact_id,
+            self.release_version
         )
     }
 
@@ -93,7 +97,7 @@ pub(crate) struct FeaturePackEntry {
 #[derive(Debug, Deserialize)]
 pub(crate) struct VersionEntry {
     pub version: String,
-    pub maven_version: String,
+    pub release_version: String,
 }
 
 /// Registry of [`FeaturePack`] entries loaded from a TOML configuration file.
@@ -167,7 +171,7 @@ impl FeaturePackRegistry {
                     shortcut_index,
                     version_index: vi,
                     version: version.clone(),
-                    maven_version: ve.maven_version,
+                    release_version: ve.release_version,
                 };
                 feature_packs.insert((entry.shortcut.clone(), version), feature_pack);
             }

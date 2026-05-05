@@ -117,16 +117,20 @@ config_version = 1
 major = 30
 minor = 0
 version = "30.0.0"
+release_version = "30.0.0.Final"
 core_version = "22.0.0"
-suffix = "Final"
+core_release_version = "22.0.0.Final"
+image_tag = "30.0.0.Final"
 repository = "quay.io/wildfly/wildfly"
 
 [[wildfly_images]]
 major = 31
 minor = 0
 version = "31.0.0"
+release_version = "31.0.0.Final"
 core_version = "23.0.0"
-suffix = "Final"
+core_release_version = "23.0.0.Final"
+image_tag = "31.0.0.Final"
 repository = "quay.io/wildfly/wildfly"
 "#;
 
@@ -137,16 +141,20 @@ config_version = 2
 major = 31
 minor = 0
 version = "31.0.0"
+release_version = "31.0.0.Final"
 core_version = "23.0.0"
-suffix = "Final"
+core_release_version = "23.0.0.Final"
+image_tag = "31.0.0.Final"
 repository = "quay.io/wildfly/wildfly"
 
 [[wildfly_images]]
 major = 32
 minor = 0
 version = "32.0.0"
+release_version = "32.0.0.Final"
 core_version = "24.0.0"
-suffix = "Final"
+core_release_version = "24.0.0.Final"
+image_tag = "32.0.0.Final"
 repository = "quay.io/wildfly/wildfly"
 "#;
 
@@ -182,7 +190,7 @@ name = "AI"
 group_id = "org.wildfly.ai"
 artifact_id = "wildfly-ai-feature-pack"
 versions = [
-  { version = "0.9.0", maven_version = "0.9.0" },
+  { version = "0.9.0", release_version = "0.9.0" },
 ]
 
 [[feature_packs]]
@@ -191,7 +199,7 @@ name = "GraphQL"
 group_id = "org.wildfly.extras.graphql"
 artifact_id = "wildfly-graphql-feature-pack"
 versions = [
-  { version = "2.3.0", maven_version = "2.3.0.Final" },
+  { version = "2.3.0", release_version = "2.3.0.Final" },
 ]
 "#;
 
@@ -204,8 +212,8 @@ name = "AI"
 group_id = "org.wildfly.ai"
 artifact_id = "wildfly-ai-feature-pack"
 versions = [
-  { version = "0.9.0", maven_version = "0.9.0" },
-  { version = "1.0.0", maven_version = "1.0.0" },
+  { version = "0.9.0", release_version = "0.9.0" },
+  { version = "1.0.0", release_version = "1.0.0" },
 ]
 "#;
 

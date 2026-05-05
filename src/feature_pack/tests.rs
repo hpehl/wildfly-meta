@@ -240,8 +240,8 @@ name = "AI"
 group_id = "org.wildfly.ai"
 artifact_id = "wildfly-ai-fp"
 versions = [
-  { version = "0.8.0", maven_version = "0.8.0" },
-  { version = "0.9.0", maven_version = "0.9.0" },
+  { version = "0.8.0", release_version = "0.8.0" },
+  { version = "0.9.0", release_version = "0.9.0" },
 ]
 "#;
     let reg = FeaturePackRegistry::from_toml(toml).unwrap();
