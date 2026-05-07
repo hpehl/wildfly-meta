@@ -338,3 +338,32 @@ fn partial_ord_consistent_with_ord() {
     assert_eq!(b.partial_cmp(a), Some(Ordering::Greater));
     assert_eq!(a.partial_cmp(a), Some(Ordering::Equal));
 }
+
+// ------------------------------------------------------ stability support
+
+#[test]
+fn supports_stability_below_threshold() {
+    let reg = test_registry();
+    let img = reg.get(300).unwrap(); // WildFly 30.0
+    assert!(!img.supports_stability());
+}
+
+#[test]
+fn supports_stability_at_threshold() {
+    let reg = test_registry();
+    let img = reg.get(310).unwrap(); // WildFly 31.0
+    assert!(img.supports_stability());
+}
+
+#[test]
+fn supports_stability_above_threshold() {
+    let reg = test_registry();
+    let img = reg.get(390).unwrap(); // WildFly 39.0
+    assert!(img.supports_stability());
+}
+
+#[test]
+fn supports_stability_dev() {
+    let dev = wildfly_dev();
+    assert!(dev.supports_stability());
+}

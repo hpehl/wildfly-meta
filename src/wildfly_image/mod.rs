@@ -20,6 +20,9 @@ pub static DEVELOPMENT_TAG: &str = "development";
 const HTTP_PORT_BASE: u16 = 8000;
 const MANAGEMENT_PORT_BASE: u16 = 9000;
 
+/// Minimum identifier for stability level support (WildFly 31.0).
+const STABILITY_MIN_IDENTIFIER: u16 = 310;
+
 /// Returns a [`WildFlyImage`] representing the WildFly development build.
 ///
 /// The development image has an identifier of `0` and builds from the WildFly Git repository
@@ -109,6 +112,14 @@ impl WildFlyImage {
         MANAGEMENT_PORT_BASE
             .checked_add(self.identifier)
             .expect("management port overflow")
+    }
+
+    /// Returns `true` if this WildFly version supports the `--stability` CLI parameter.
+    ///
+    /// Stability levels were introduced in WildFly 31. Dev builds always support stability
+    /// since they track the latest WildFly source.
+    pub fn supports_stability(&self) -> bool {
+        self.is_dev() || self.identifier >= STABILITY_MIN_IDENTIFIER
     }
 }
 
