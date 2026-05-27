@@ -1,4 +1,4 @@
-config_version = 4
+config_version = 5
 
 [[feature_packs]]
 shortcut = "ai"
@@ -30,6 +30,15 @@ versions = [
   { version = "0.1.16", release_version = "0.1.16.Final" },
   { version = "0.1.15", release_version = "0.1.15.Final" },
   { version = "0.1.14", release_version = "0.1.14.Final" },
+]
+
+[[feature_packs]]
+shortcut = "vault"
+name = "Vault"
+group_id = "org.wildfly.security.vault"
+artifact_id = "wildfly-vault-feature-pack"
+versions = [
+  { version = "1.0.0", release_version = "1.0.0.Final" },
 ]
 
 [[feature_packs]]
