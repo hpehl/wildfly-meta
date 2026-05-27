@@ -10,10 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add WildFly 40.0.0 container image metadata
+- Add WildFly Vault feature pack
 
 ### Changed
 
 - Refactor WildFly image tests to be version-independent, avoiding hardcoded counts and version identifiers
+- Refactor feature pack tests to use structural invariants and inline TOML, making them robust against adding, removing, or reordering feature packs
+- Bump reqwest to 0.13.4
 
 ## [0.7.1] - 2026-05-07
 

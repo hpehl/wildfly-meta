@@ -33,15 +33,6 @@ versions = [
 ]
 
 [[feature_packs]]
-shortcut = "vault"
-name = "Vault"
-group_id = "org.wildfly.security.vault"
-artifact_id = "wildfly-vault-feature-pack"
-versions = [
-  { version = "1.0.0", release_version = "1.0.0.Final" },
-]
-
-[[feature_packs]]
 shortcut = "myfaces"
 name = "MyFaces"
 group_id = "org.wildfly"
@@ -49,4 +40,13 @@ artifact_id = "wildfly-myfaces-feature-pack"
 versions = [
   { version = "2.0.3", release_version = "2.0.3.Final" },
   { version = "2.0.2", release_version = "2.0.2.Final" },
+]
+
+[[feature_packs]]
+shortcut = "vault"
+name = "Vault"
+group_id = "org.wildfly.security.vault"
+artifact_id = "wildfly-vault-feature-pack"
+versions = [
+  { version = "1.0.0", release_version = "1.0.0.Final" },
 ]

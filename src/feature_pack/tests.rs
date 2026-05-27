@@ -152,8 +152,15 @@ fn known_shortcuts() {
 #[test]
 fn known_versions_for_shortcut() {
     let reg = test_registry();
-    let versions = reg.known_versions("ai");
-    assert_eq!(versions, vec!["0.8.1", "0.9.0", "0.9.1"]);
+    let shortcuts = reg.known_shortcuts();
+    for shortcut in &shortcuts {
+        let versions = reg.known_versions(shortcut);
+        assert!(!versions.is_empty(), "{shortcut} should have at least one version");
+        let mut sorted = versions.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(versions.len(), sorted.len(), "{shortcut} versions should be unique");
+    }
 }
 
 #[test]
@@ -166,10 +173,16 @@ fn known_versions_unknown() {
 fn all_identifiers() {
     let reg = test_registry();
     let ids = reg.all_identifiers();
-    assert!(ids.contains(&"ai".to_string()));
-    assert!(ids.contains(&"ai:0.9.0".to_string()));
-    assert!(ids.contains(&"grpc".to_string()));
-    assert!(ids.contains(&"grpc:0.1.16".to_string()));
+    let shortcuts = reg.known_shortcuts();
+    for shortcut in &shortcuts {
+        assert!(ids.contains(&shortcut.to_string()), "identifiers should contain shortcut {shortcut}");
+        for version in reg.known_versions(shortcut) {
+            assert!(
+                ids.contains(&format!("{shortcut}:{version}")),
+                "identifiers should contain {shortcut}:{version}"
+            );
+        }
+    }
 }
 
 #[test]
@@ -213,20 +226,96 @@ versions = []
 // ------------------------------------------------------ index computation
 
 #[test]
-fn shortcut_index_computed() {
+fn shortcut_index_unique_per_shortcut() {
     let reg = test_registry();
-    assert_eq!(reg.get("ai", "0.9.0").unwrap().shortcut_index, 0);
-    assert_eq!(reg.get("graphql", "2.7.0").unwrap().shortcut_index, 1);
-    assert_eq!(reg.get("grpc", "0.1.16").unwrap().shortcut_index, 2);
-    assert_eq!(reg.get("myfaces", "2.0.3").unwrap().shortcut_index, 3);
+    let mut index_by_shortcut: std::collections::HashMap<&str, u16> = std::collections::HashMap::new();
+    for fp in reg.all() {
+        match index_by_shortcut.get(fp.shortcut.as_str()) {
+            Some(&existing) => assert_eq!(
+                existing, fp.shortcut_index,
+                "{} should have consistent shortcut_index across versions",
+                fp.shortcut
+            ),
+            None => {
+                index_by_shortcut.insert(&fp.shortcut, fp.shortcut_index);
+            }
+        }
+    }
+    let mut indices: Vec<u16> = index_by_shortcut.values().copied().collect();
+    indices.sort();
+    let expected: Vec<u16> = (0..indices.len() as u16).collect();
+    assert_eq!(indices, expected, "shortcut indices should be 0..n without gaps");
 }
 
 #[test]
-fn version_index_computed() {
+fn version_index_unique_per_shortcut() {
     let reg = test_registry();
-    assert_eq!(reg.get("ai", "0.9.1").unwrap().version_index, 0);
-    assert_eq!(reg.get("ai", "0.9.0").unwrap().version_index, 1);
-    assert_eq!(reg.get("ai", "0.8.1").unwrap().version_index, 2);
+    for shortcut in &reg.known_shortcuts() {
+        let mut indices: Vec<u16> = reg
+            .all()
+            .iter()
+            .filter(|fp| fp.shortcut == *shortcut)
+            .map(|fp| fp.version_index)
+            .collect();
+        indices.sort();
+        let expected: Vec<u16> = (0..indices.len() as u16).collect();
+        assert_eq!(
+            indices, expected,
+            "{shortcut} version indices should be 0..n without gaps"
+        );
+    }
+}
+
+#[test]
+fn shortcut_index_exact_values() {
+    let toml = r#"
+config_version = 1
+
+[[feature_packs]]
+shortcut = "alpha"
+name = "Alpha"
+group_id = "org.example"
+artifact_id = "alpha-fp"
+versions = [
+  { version = "1.0.0", release_version = "1.0.0" },
+]
+
+[[feature_packs]]
+shortcut = "beta"
+name = "Beta"
+group_id = "org.example"
+artifact_id = "beta-fp"
+versions = [
+  { version = "2.0.0", release_version = "2.0.0" },
+  { version = "2.1.0", release_version = "2.1.0" },
+]
+"#;
+    let reg = FeaturePackRegistry::from_toml(toml).unwrap();
+    assert_eq!(reg.get("alpha", "1.0.0").unwrap().shortcut_index, 0);
+    assert_eq!(reg.get("beta", "2.0.0").unwrap().shortcut_index, 1);
+    assert_eq!(reg.get("beta", "2.1.0").unwrap().shortcut_index, 1);
+}
+
+#[test]
+fn version_index_exact_values() {
+    let toml = r#"
+config_version = 1
+
+[[feature_packs]]
+shortcut = "alpha"
+name = "Alpha"
+group_id = "org.example"
+artifact_id = "alpha-fp"
+versions = [
+  { version = "1.0.0", release_version = "1.0.0" },
+  { version = "1.1.0", release_version = "1.1.0" },
+  { version = "1.2.0", release_version = "1.2.0" },
+]
+"#;
+    let reg = FeaturePackRegistry::from_toml(toml).unwrap();
+    assert_eq!(reg.get("alpha", "1.0.0").unwrap().version_index, 0);
+    assert_eq!(reg.get("alpha", "1.1.0").unwrap().version_index, 1);
+    assert_eq!(reg.get("alpha", "1.2.0").unwrap().version_index, 2);
 }
 
 #[test]
@@ -258,12 +347,33 @@ versions = [
 // ------------------------------------------------------ feature pack methods
 
 #[test]
-fn port_offset() {
-    let reg = test_registry();
-    assert_eq!(reg.get("ai", "0.9.1").unwrap().port_offset(), 10_000);
-    assert_eq!(reg.get("graphql", "2.7.0").unwrap().port_offset(), 10_100);
-    assert_eq!(reg.get("grpc", "0.1.16").unwrap().port_offset(), 10_200);
-    assert_eq!(reg.get("myfaces", "2.0.3").unwrap().port_offset(), 10_300);
+fn port_offset_exact_values() {
+    let toml = r#"
+config_version = 1
+
+[[feature_packs]]
+shortcut = "alpha"
+name = "Alpha"
+group_id = "org.example"
+artifact_id = "alpha-fp"
+versions = [
+  { version = "1.0.0", release_version = "1.0.0" },
+  { version = "1.1.0", release_version = "1.1.0" },
+]
+
+[[feature_packs]]
+shortcut = "beta"
+name = "Beta"
+group_id = "org.example"
+artifact_id = "beta-fp"
+versions = [
+  { version = "2.0.0", release_version = "2.0.0" },
+]
+"#;
+    let reg = FeaturePackRegistry::from_toml(toml).unwrap();
+    assert_eq!(reg.get("alpha", "1.0.0").unwrap().port_offset(), 10_000);
+    assert_eq!(reg.get("alpha", "1.1.0").unwrap().port_offset(), 10_001);
+    assert_eq!(reg.get("beta", "2.0.0").unwrap().port_offset(), 10_100);
 }
 
 #[test]
