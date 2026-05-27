@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add WildFly 40.0.0 container image metadata
+
+### Changed
+
+- Refactor WildFly image tests to be version-independent, avoiding hardcoded counts and version identifiers
+
 ## [0.7.1] - 2026-05-07
 
 ### Added

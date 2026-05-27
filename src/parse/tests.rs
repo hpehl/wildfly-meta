@@ -358,7 +358,7 @@ fn parse_meta_items_range_all() {
         &DslOptions::all(),
     )
     .unwrap();
-    assert_eq!(items.len(), 33);
+    assert_eq!(items.len(), wildfly_images.len());
 }
 
 #[test]
