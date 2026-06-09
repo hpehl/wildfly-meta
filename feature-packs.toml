@@ -24,9 +24,10 @@ versions = [
 [[feature_packs]]
 shortcut = "grpc"
 name = "gRPC"
-group_id = "org.wildfly.extras.grpc"
+group_id = "org.wildfly.grpc"
 artifact_id = "wildfly-grpc-feature-pack"
 versions = [
+  { version = "0.2.0", release_version = "0.2.0.Final" },
   { version = "0.1.16", release_version = "0.1.16.Final" },
   { version = "0.1.15", release_version = "0.1.15.Final" },
   { version = "0.1.14", release_version = "0.1.14.Final" },
