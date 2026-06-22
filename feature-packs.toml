@@ -21,6 +21,9 @@ versions = [
   { version = "2.6.0", release_version = "2.6.0.Final" },
 ]
 
+# Please note that the group_id has changed 
+# from "org.wildfly.extras.grpc" to "org.wildfly.grpc"
+# starting with version 0.2.0
 [[feature_packs]]
 shortcut = "grpc"
 name = "gRPC"
