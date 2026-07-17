@@ -71,7 +71,8 @@ fn parse_fp_shortcut() {
     let reg = feature_pack_registry();
     let feature_pack = parse_feature_pack("ai", &reg).unwrap();
     assert_eq!(feature_pack.shortcut, "ai");
-    assert_eq!(feature_pack.version.to_string(), "0.9.1");
+    let expected_version = reg.latest("ai").unwrap().version.to_string();
+    assert_eq!(feature_pack.version.to_string(), expected_version);
 }
 
 #[test]
@@ -606,7 +607,8 @@ fn meta_item_short_name_feature_pack() {
     let feature_packs = feature_pack_registry();
     let feature_pack = parse_feature_pack("ai", &feature_packs).unwrap();
     let item = MetaItem::FeaturePack(feature_pack);
-    assert_eq!(item.short_name(), "ai 0.9.1");
+    let expected = format!("ai {}", feature_packs.latest("ai").unwrap().version);
+    assert_eq!(item.short_name(), expected);
 }
 
 #[test]
@@ -638,7 +640,11 @@ fn meta_item_full_name() {
     let wildfly_image = parse_meta_item("34", &wildfly_images, &feature_packs).unwrap();
     assert_eq!(wildfly_image.full_name(), "WildFly 34.0");
     let feature_pack = parse_meta_item("ai", &wildfly_images, &feature_packs).unwrap();
-    assert_eq!(feature_pack.full_name(), "AI Feature Pack 0.9.1");
+    let expected = format!(
+        "AI Feature Pack {}",
+        feature_packs.latest("ai").unwrap().version
+    );
+    assert_eq!(feature_pack.full_name(), expected);
 }
 
 #[test]
@@ -648,7 +654,9 @@ fn meta_item_container_name() {
     let wildfly_image = parse_meta_item("34", &wildfly_images, &feature_packs).unwrap();
     assert_eq!(wildfly_image.container_name(), "340");
     let feature_pack = parse_meta_item("ai", &wildfly_images, &feature_packs).unwrap();
-    assert_eq!(feature_pack.container_name(), "ai-0-9-1");
+    let latest = feature_packs.latest("ai").unwrap();
+    let expected = format!("ai-{}", latest.version.to_string().replace('.', "-"));
+    assert_eq!(feature_pack.container_name(), expected);
 }
 
 #[test]
