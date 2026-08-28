@@ -142,13 +142,13 @@ elif command -v docker &>/dev/null; then
 else
   die "Neither 'podman' nor 'docker' found. Please install a container runtime."
 fi
-msg "  Container runtime: ${CYAN}${CONTAINER_CMD}${NOFORMAT}"
+msg "Container runtime: ${CYAN}${CONTAINER_CMD}${NOFORMAT}"
 
 # Check that wildfly-images.toml has the requested version
 if ! grep -q "version = \"${WILDFLY_VERSION}" wildfly-images.toml; then
   die "Version ${WILDFLY_VERSION} not found in wildfly-images.toml. Please update the file first."
 fi
-msg "  Version ${CYAN}${WILDFLY_VERSION}${NOFORMAT} found in wildfly-images.toml"
+msg "Version ${CYAN}${WILDFLY_VERSION}${NOFORMAT} found in wildfly-images.toml"
 
 # Check that config_version was bumped (compare working tree against origin/main)
 LOCAL_CONFIG_VERSION=$(grep -m1 '^config_version' wildfly-images.toml | grep -o '[0-9]*')
@@ -156,20 +156,20 @@ REMOTE_CONFIG_VERSION=$(git show origin/main:wildfly-images.toml 2>/dev/null | g
 if [[ "${LOCAL_CONFIG_VERSION}" -le "${REMOTE_CONFIG_VERSION}" ]]; then
   die "config_version (${LOCAL_CONFIG_VERSION}) was not bumped. Please increment it in wildfly-images.toml."
 fi
-msg "  config_version bumped: ${REMOTE_CONFIG_VERSION} → ${CYAN}${LOCAL_CONFIG_VERSION}${NOFORMAT}"
+msg "config_version bumped: ${REMOTE_CONFIG_VERSION} → ${CYAN}${LOCAL_CONFIG_VERSION}${NOFORMAT}"
 
 # Check for uncommitted changes to the TOML
 if ! git diff --quiet wildfly-images.toml 2>/dev/null || ! git diff --cached --quiet wildfly-images.toml 2>/dev/null; then
   die "wildfly-images.toml has uncommitted changes. Please commit first."
 fi
-msg "  wildfly-images.toml is committed"
+msg "wildfly-images.toml is committed"
 
 # Check that there are unpushed commits (the script handles the push)
 UNPUSHED=$(git log origin/main..HEAD --oneline 2>/dev/null | wc -l | tr -d ' ')
 if [[ "${UNPUSHED}" -eq 0 ]]; then
   die "No unpushed commits found. The TOML changes should be committed but not yet pushed."
 fi
-msg "  ${CYAN}${UNPUSHED}${NOFORMAT} unpushed commit(s) — script will push in step 1"
+msg "${CYAN}${UNPUSHED}${NOFORMAT} unpushed commit(s) — script will push in step 1"
 
 # ------------------------------------------------------ summary
 
@@ -177,11 +177,11 @@ msg ""
 msg "${BLUE}Plan${NOFORMAT}"
 msg ""
 if [[ "${DRY_RUN}" == true ]]; then
-  msg "  ${YELLOW}DRY RUN${NOFORMAT} — push steps will be skipped"
+  msg "${YELLOW}DRY RUN${NOFORMAT} — push steps will be skipped"
 fi
-msg "  WildFly version:  ${CYAN}${WILDFLY_VERSION}${NOFORMAT}"
-[[ "${SKIP_WADO}" == true ]] && msg "  wado:             ${YELLOW}skipped${NOFORMAT}" || msg "  wado:             build and push"
-[[ "${SKIP_MGT}" == true ]]  && msg "  mgt:              ${YELLOW}skipped${NOFORMAT}" || msg "  mgt:              analyze and push"
+msg "WildFly version:  ${CYAN}${WILDFLY_VERSION}${NOFORMAT}"
+[[ "${SKIP_WADO}" == true ]] && msg "wado:             ${YELLOW}skipped${NOFORMAT}" || msg "wado:             build and push"
+[[ "${SKIP_MGT}" == true ]]  && msg "mgt:              ${YELLOW}skipped${NOFORMAT}" || msg "mgt:              analyze and push"
 msg ""
 
 echo "Do you wish to continue?"
@@ -199,11 +199,11 @@ msg "${BLUE}Step 1: Push TOML changes${NOFORMAT}"
 msg ""
 
 if [[ "${DRY_RUN}" == true ]]; then
-  msg "  ${YELLOW}DRY RUN: Skipping git push${NOFORMAT}"
+  msg "${YELLOW}DRY RUN: Skipping git push${NOFORMAT}"
 else
   git push
-  msg "  Pushed to origin"
-  msg "  Waiting for GitHub CDN to update..."
+  msg "Pushed to origin"
+  msg "Waiting for GitHub CDN to update..."
   sleep 10
 fi
 
@@ -214,9 +214,9 @@ msg "${BLUE}Step 2: Update local metadata${NOFORMAT}"
 msg ""
 
 wado update --json
-msg "  wado metadata updated"
+msg "wado metadata updated"
 mgt update --json
-msg "  mgt metadata updated"
+msg "mgt metadata updated"
 
 # ------------------------------------------------------ wado
 
@@ -225,16 +225,16 @@ if [[ "${SKIP_WADO}" == false ]]; then
   msg "${BLUE}Step 3: Build and push wado images${NOFORMAT}"
   msg ""
 
-  msg "  Stopping all running wado containers..."
+  msg "Stopping all running wado containers..."
   wado stop --all --json || true
 
-  msg "  Building wado images for ${WILDFLY_VERSION}..."
+  msg "Building wado images for ${WILDFLY_VERSION}..."
   wado build "${WILDFLY_VERSION}" --verbose
 
   if [[ "${DRY_RUN}" == true ]]; then
-    msg "  ${YELLOW}DRY RUN: Skipping wado push${NOFORMAT}"
+    msg "${YELLOW}DRY RUN: Skipping wado push${NOFORMAT}"
   else
-    msg "  Pushing wado images for ${WILDFLY_VERSION}..."
+    msg "Pushing wado images for ${WILDFLY_VERSION}..."
     wado push "${WILDFLY_VERSION}" --json
   fi
 fi
@@ -246,16 +246,16 @@ if [[ "${SKIP_MGT}" == false ]]; then
   msg "${BLUE}Step 4: Analyze and push mgt images${NOFORMAT}"
   msg ""
 
-  msg "  Stopping all running wado containers..."
+  msg "Stopping all running wado containers..."
   wado stop --all --json || true
 
-  msg "  Analyzing ${WILDFLY_VERSION}..."
+  msg "Analyzing ${WILDFLY_VERSION}..."
   mgt analyze "${WILDFLY_VERSION}" --json
 
   if [[ "${DRY_RUN}" == true ]]; then
-    msg "  ${YELLOW}DRY RUN: Skipping mgt push${NOFORMAT}"
+    msg "${YELLOW}DRY RUN: Skipping mgt push${NOFORMAT}"
   else
-    msg "  Pushing mgt images for ${WILDFLY_VERSION}..."
+    msg "Pushing mgt images for ${WILDFLY_VERSION}..."
     mgt push "${WILDFLY_VERSION}" --json
   fi
 fi
