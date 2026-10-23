@@ -120,8 +120,8 @@ parse_params() {
   return 0
 }
 
-parse_params "$@"
 setup_colors
+parse_params "$@"
 
 # ------------------------------------------------------ preflight checks
 

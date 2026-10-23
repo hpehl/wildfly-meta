@@ -9,10 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add WildFly 42.0.0.Final container image metadata
 - Add WildFly 41.0.1.Final, 41.0.0.Final, 40.0.1.Final, and 40.0.0.Final container image metadata
+- Add `wildfly-update.sh` script to automate wado/mgt image builds for new WildFly versions
 - Add WildFly Vault feature pack
 - Add gRPC feature pack support
 - Add new feature pack versions for AI (0.20.1, 0.10.0), GraphQL (2.6.0), MyFaces (5.1.0), Vault (1.0.1), and gRPC (0.2.1, 0.2.0)
+
+### Fixed
+
+- Fix unbound color variables in `wildfly-update.sh` when argument parsing fails before color setup
+- Fix indentation in `wildfly-update.sh` output messages
 
 ### Changed
 
