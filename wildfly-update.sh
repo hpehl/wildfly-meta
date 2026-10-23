@@ -49,6 +49,7 @@ FLAGS:
     -h, --help          Prints help information
     -v, --version       Prints version information
     --dry-run           Run everything except push steps
+    --skip-push         Skip git push and related preflight checks (resume after a partial run)
     --skip-wado         Skip wado build and push
     --skip-mgt          Skip mgt analyze and push
     --no-color          Uses plain text output
@@ -96,6 +97,7 @@ version() {
 }
 
 DRY_RUN=false
+SKIP_PUSH=false
 SKIP_WADO=false
 SKIP_MGT=false
 
@@ -105,6 +107,7 @@ parse_params() {
     -h | --help) usage ;;
     -v | --version) version ;;
     --dry-run) DRY_RUN=true ;;
+    --skip-push) SKIP_PUSH=true ;;
     --skip-wado) SKIP_WADO=true ;;
     --skip-mgt) SKIP_MGT=true ;;
     --no-color) NO_COLOR=1 ;;
@@ -150,26 +153,31 @@ if ! grep -q "version = \"${WILDFLY_VERSION}" wildfly-images.toml; then
 fi
 msg "Version ${CYAN}${WILDFLY_VERSION}${NOFORMAT} found in wildfly-images.toml"
 
-# Check that config_version was bumped (compare working tree against origin/main)
 LOCAL_CONFIG_VERSION=$(grep -m1 '^config_version' wildfly-images.toml | grep -o '[0-9]*')
-REMOTE_CONFIG_VERSION=$(git show origin/main:wildfly-images.toml 2>/dev/null | grep -m1 '^config_version' | grep -o '[0-9]*' || echo "0")
-if [[ "${LOCAL_CONFIG_VERSION}" -le "${REMOTE_CONFIG_VERSION}" ]]; then
-  die "config_version (${LOCAL_CONFIG_VERSION}) was not bumped. Please increment it in wildfly-images.toml."
-fi
-msg "config_version bumped: ${REMOTE_CONFIG_VERSION} → ${CYAN}${LOCAL_CONFIG_VERSION}${NOFORMAT}"
 
-# Check for uncommitted changes to the TOML
-if ! git diff --quiet wildfly-images.toml 2>/dev/null || ! git diff --cached --quiet wildfly-images.toml 2>/dev/null; then
-  die "wildfly-images.toml has uncommitted changes. Please commit first."
-fi
-msg "wildfly-images.toml is committed"
+if [[ "${SKIP_PUSH}" == true ]]; then
+  msg "${YELLOW}--skip-push${NOFORMAT}: skipping push-related preflight checks"
+else
+  # Check that config_version was bumped (compare working tree against origin/main)
+  REMOTE_CONFIG_VERSION=$(git show origin/main:wildfly-images.toml 2>/dev/null | grep -m1 '^config_version' | grep -o '[0-9]*' || echo "0")
+  if [[ "${LOCAL_CONFIG_VERSION}" -le "${REMOTE_CONFIG_VERSION}" ]]; then
+    die "config_version (${LOCAL_CONFIG_VERSION}) was not bumped. Please increment it in wildfly-images.toml."
+  fi
+  msg "config_version bumped: ${REMOTE_CONFIG_VERSION} → ${CYAN}${LOCAL_CONFIG_VERSION}${NOFORMAT}"
 
-# Check that there are unpushed commits (the script handles the push)
-UNPUSHED=$(git log origin/main..HEAD --oneline 2>/dev/null | wc -l | tr -d ' ')
-if [[ "${UNPUSHED}" -eq 0 ]]; then
-  die "No unpushed commits found. The TOML changes should be committed but not yet pushed."
+  # Check for uncommitted changes to the TOML
+  if ! git diff --quiet wildfly-images.toml 2>/dev/null || ! git diff --cached --quiet wildfly-images.toml 2>/dev/null; then
+    die "wildfly-images.toml has uncommitted changes. Please commit first."
+  fi
+  msg "wildfly-images.toml is committed"
+
+  # Check that there are unpushed commits (the script handles the push)
+  UNPUSHED=$(git log origin/main..HEAD --oneline 2>/dev/null | wc -l | tr -d ' ')
+  if [[ "${UNPUSHED}" -eq 0 ]]; then
+    die "No unpushed commits found. The TOML changes should be committed but not yet pushed."
+  fi
+  msg "${CYAN}${UNPUSHED}${NOFORMAT} unpushed commit(s) — script will push in step 1"
 fi
-msg "${CYAN}${UNPUSHED}${NOFORMAT} unpushed commit(s) — script will push in step 1"
 
 # ------------------------------------------------------ summary
 
@@ -180,6 +188,7 @@ if [[ "${DRY_RUN}" == true ]]; then
   msg "${YELLOW}DRY RUN${NOFORMAT} — push steps will be skipped"
 fi
 msg "WildFly version:  ${CYAN}${WILDFLY_VERSION}${NOFORMAT}"
+[[ "${SKIP_PUSH}" == true ]] && msg "push:             ${YELLOW}skipped${NOFORMAT}" || msg "push:             git push"
 [[ "${SKIP_WADO}" == true ]] && msg "wado:             ${YELLOW}skipped${NOFORMAT}" || msg "wado:             build and push"
 [[ "${SKIP_MGT}" == true ]]  && msg "mgt:              ${YELLOW}skipped${NOFORMAT}" || msg "mgt:              analyze and push"
 msg ""
@@ -194,15 +203,21 @@ done
 
 # ------------------------------------------------------ push TOML changes
 
-msg ""
-msg "${BLUE}Step 1: Push TOML changes${NOFORMAT}"
-msg ""
-
-if [[ "${DRY_RUN}" == true ]]; then
-  msg "${YELLOW}DRY RUN: Skipping git push${NOFORMAT}"
+if [[ "${SKIP_PUSH}" == true ]]; then
+  msg ""
+  msg "${BLUE}Step 1: Push TOML changes — ${YELLOW}skipped${NOFORMAT}"
+  msg ""
 else
-  git push
-  msg "Pushed to origin"
+  msg ""
+  msg "${BLUE}Step 1: Push TOML changes${NOFORMAT}"
+  msg ""
+
+  if [[ "${DRY_RUN}" == true ]]; then
+    msg "${YELLOW}DRY RUN: Skipping git push${NOFORMAT}"
+  else
+    git push
+    msg "Pushed to origin"
+  fi
 fi
 
 # ------------------------------------------------------ update metadata
@@ -211,7 +226,7 @@ msg ""
 msg "${BLUE}Step 2: Update local metadata${NOFORMAT}"
 msg ""
 
-if [[ "${DRY_RUN}" == false ]]; then
+if [[ "${DRY_RUN}" == false && "${SKIP_PUSH}" == false ]]; then
   MAX_RETRIES=12
   RETRY_DELAY=10
   msg "Waiting for GitHub CDN to serve config_version=${LOCAL_CONFIG_VERSION}..."
