@@ -203,8 +203,6 @@ if [[ "${DRY_RUN}" == true ]]; then
 else
   git push
   msg "Pushed to origin"
-  msg "Waiting for GitHub CDN to update..."
-  sleep 10
 fi
 
 # ------------------------------------------------------ update metadata
@@ -212,6 +210,25 @@ fi
 msg ""
 msg "${BLUE}Step 2: Update local metadata${NOFORMAT}"
 msg ""
+
+if [[ "${DRY_RUN}" == false ]]; then
+  MAX_RETRIES=12
+  RETRY_DELAY=10
+  msg "Waiting for GitHub CDN to serve config_version=${LOCAL_CONFIG_VERSION}..."
+  for ((i=1; i<=MAX_RETRIES; i++)); do
+    CDN_VERSION=$(curl -sf "https://raw.githubusercontent.com/hpehl/wildfly-meta/main/wildfly-images.toml" \
+      | grep -m1 '^config_version' | grep -o '[0-9]*' || echo "0")
+    if [[ "${CDN_VERSION}" -ge "${LOCAL_CONFIG_VERSION}" ]]; then
+      msg "GitHub CDN updated (config_version=${CDN_VERSION})"
+      break
+    fi
+    if [[ $i -eq $MAX_RETRIES ]]; then
+      die "GitHub CDN did not update after $((MAX_RETRIES * RETRY_DELAY))s (expected config_version=${LOCAL_CONFIG_VERSION}, got ${CDN_VERSION})"
+    fi
+    msg "  attempt ${i}/${MAX_RETRIES} — got version ${CDN_VERSION}, retrying in ${RETRY_DELAY}s..."
+    sleep "${RETRY_DELAY}"
+  done
+fi
 
 wado update --json
 msg "wado metadata updated"
